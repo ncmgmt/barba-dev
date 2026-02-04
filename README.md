@@ -14,6 +14,9 @@ Webflow-friendly Barba.js page transitions with per-namespace (per page) script 
 
 ## How it works
 - `dist/core.js` is included globally via Webflow **Site Settings**.
+- Core expects your existing transition elements to exist:
+  - `.layout_transition_wrap` with children `.layout_column_el`
+  - `.logo_wrap` (only animates on first load, uses `sessionStorage.logoAnimated`)
 - Each namespace has a controller file under `dist/pages/<Namespace>.js`.
 - Controllers register themselves as `window.WFApp.pages[namespace]` and expose:
   - `init({ container, namespace })`
@@ -38,8 +41,8 @@ Webflow-friendly Barba.js page transitions with per-namespace (per page) script 
    </body>
    ```
    Then recommended:
-   - `<page_contain data-barba="wrapper">`
-   - `<content_wrap data-barba="container" data-barba-namespace="Home">`
+   - `<div class="page_contain" data-barba="wrapper">` (or your existing wrapper element)
+   - `<div class="content_wrap" data-barba="container" data-barba-namespace="Home">`
 
 ## CDN usage (jsDelivr)
 Example:

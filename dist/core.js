@@ -23,11 +23,15 @@
     // window.WFAPP_CDN_BASE = 'https://cdn.jsdelivr.net/gh/ncmgmt/barba-dev@main/dist/pages';
     cdnBase: (window.WFAPP_CDN_BASE || 'https://cdn.jsdelivr.net/gh/ncmgmt/barba-dev@main/dist/pages'),
 
-    // Transition overlay selector (optional)
-    transitionScreenSelector: '.transition-screen',
+    // Transition elements (existing Webflow structure)
+    transitionWrapSelector: '.layout_transition_wrap',
+    transitionColumnSelector: '.layout_column_el',
+    logoWrapSelector: '.logo_wrap',
+    fadeContainSelector: '[data-transition-contain="fade"]',
+    contentWrapSelector: '.content_wrap',
 
     // Delay between leave-start and DOM swap (ms)
-    transitionOffset: 300,
+    transitionOffset: 0,
 
     // Namespaces that exist (for safety)
     namespaces: ['Home', 'Portfolio', 'Team', 'Insights', 'Contact', 'Imprint', 'Legal', 'PrivacyPolicy']
@@ -76,36 +80,189 @@
     }
   }
 
-  // ---- Transition helpers (optional GSAP overlay) ----
+  // ---- Transition helpers (GSAP columns + logo, like bw24) ----
 
-  function transitionIn() {
-    var sel = CONFIG.transitionScreenSelector;
-    var el = sel ? document.querySelector(sel) : null;
-    if (!el) return;
-
-    // If GSAP present, animate; else just show/hide quickly
-    if (window.gsap) {
-      window.gsap.killTweensOf(el);
-      window.gsap.set(el, { autoAlpha: 0 });
-      window.gsap.to(el, { autoAlpha: 1, duration: 0.25, ease: 'power2.out' });
-    } else {
-      el.style.opacity = '1';
-      el.style.visibility = 'visible';
-    }
+  function qs(sel, root) {
+    return (root || document).querySelector(sel);
   }
 
-  function transitionOut() {
-    var sel = CONFIG.transitionScreenSelector;
-    var el = sel ? document.querySelector(sel) : null;
-    if (!el) return;
+  function qsa(sel, root) {
+    return Array.prototype.slice.call((root || document).querySelectorAll(sel));
+  }
 
-    if (window.gsap) {
-      window.gsap.killTweensOf(el);
-      window.gsap.to(el, { autoAlpha: 0, duration: 0.35, ease: 'power2.out' });
-    } else {
-      el.style.opacity = '0';
-      el.style.visibility = 'hidden';
-    }
+  function lockBody() {
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+  }
+
+  function unlockBody() {
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.width = '';
+  }
+
+  function ensureTransitionVisible() {
+    var wrap = qs(CONFIG.transitionWrapSelector);
+    if (wrap) wrap.style.display = 'flex';
+  }
+
+  function hideTransition() {
+    var wrap = qs(CONFIG.transitionWrapSelector);
+    if (wrap) wrap.style.display = 'none';
+  }
+
+  function logoAnimationOnce() {
+    return new Promise(function (resolve) {
+      var logo = qs(CONFIG.logoWrapSelector);
+      var svg = logo ? logo.querySelector('svg') : null;
+      if (!logo || !svg || !window.gsap) return resolve();
+
+      var hasAnimated = sessionStorage.getItem('logoAnimated') === 'true';
+
+      logo.style.opacity = '1';
+      logo.style.visibility = 'visible';
+
+      if (hasAnimated) {
+        window.gsap.set(logo, {
+          clipPath: 'inset(0 0% 0 0)',
+          opacity: 1,
+          scale: 1,
+          filter: 'none'
+        });
+        document.body.classList.remove('first-load');
+        return resolve();
+      }
+
+      var paths = svg.querySelectorAll('path');
+      paths.forEach(function (p) {
+        p.style.opacity = '0';
+        p.style.fill = 'transparent';
+        p.style.stroke = 'currentColor';
+      });
+
+      var cursor = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      cursor.setAttribute('id', 'cursor-block');
+      cursor.setAttribute('fill', 'currentColor');
+      cursor.setAttribute('font-size', '26');
+      cursor.setAttribute('font-family', 'monospace');
+      cursor.textContent = '_';
+      svg.appendChild(cursor);
+
+      window.gsap.to(cursor, {
+        opacity: 0.2,
+        duration: 0.4,
+        yoyo: true,
+        repeat: -1,
+        ease: 'sine.inOut'
+      });
+
+      var i = 0;
+      var baseY = 20;
+
+      function revealNextPath() {
+        if (i >= paths.length) {
+          try { cursor.remove(); } catch (_) {}
+          document.body.classList.remove('first-load');
+          sessionStorage.setItem('logoAnimated', 'true');
+          return resolve();
+        }
+
+        var p = paths[i];
+        var bbox = p.getBBox();
+
+        window.gsap.to(cursor, {
+          x: bbox.x + bbox.width + 4,
+          y: baseY,
+          duration: 0.05,
+          ease: 'power1.inOut',
+          onUpdate: function () {
+            cursor.setAttribute('x', cursor.getAttribute('x'));
+            cursor.setAttribute('y', baseY);
+          },
+          onComplete: function () {
+            window.gsap.to(p, {
+              opacity: 1,
+              fill: 'currentColor',
+              duration: 0.12,
+              ease: 'sine.out',
+              onComplete: function () {
+                i++;
+                revealNextPath();
+              }
+            });
+          }
+        });
+      }
+
+      revealNextPath();
+    });
+  }
+
+  function animateEnter() {
+    // Transition out: columns move up, content fades in
+    return new Promise(function (resolve) {
+      var transitionWrap = qs(CONFIG.contentWrapSelector);
+      var pageTransition = qs(CONFIG.transitionWrapSelector);
+      var cols = qsa(CONFIG.transitionColumnSelector);
+      var fadeEl = qs(CONFIG.fadeContainSelector);
+
+      if (!window.gsap || !pageTransition || !cols.length) {
+        hideTransition();
+        unlockBody();
+        return resolve();
+      }
+
+      lockBody();
+      ensureTransitionVisible();
+
+      if (transitionWrap) window.gsap.set(transitionWrap, { opacity: 1 });
+
+      var tl = window.gsap.timeline({
+        onComplete: function () {
+          hideTransition();
+          unlockBody();
+          resolve();
+        }
+      });
+
+      tl.from(transitionWrap || {}, {
+        opacity: 0,
+        duration: 1.3,
+        ease: 'power4.inOut',
+        onStart: function () {
+          if (fadeEl) fadeEl.style.opacity = '1';
+        }
+      })
+        .to(cols, {
+          y: '-100vh',
+          duration: 1.25,
+          ease: 'power4.inOut',
+          stagger: { amount: 0.2, from: 'random' }
+        }, '<');
+    });
+  }
+
+  function animateLeave() {
+    // Transition in: columns move from bottom to cover
+    return new Promise(function (resolve) {
+      var pageTransition = qs(CONFIG.transitionWrapSelector);
+      var cols = qsa(CONFIG.transitionColumnSelector);
+      if (!window.gsap || !pageTransition || !cols.length) return resolve();
+
+      ensureTransitionVisible();
+      lockBody();
+
+      window.gsap.fromTo(cols, { y: '100vh' }, {
+        y: '0vh',
+        duration: 0.8,
+        ease: 'power4.inOut',
+        stagger: { amount: 0.15, from: 'random' },
+        onComplete: function () {
+          resolve();
+        }
+      });
+    });
   }
 
   // ---- Controller lifecycle ----
@@ -208,35 +365,41 @@
         {
           name: 'default',
           async once(data) {
-            // Initial load: mount page controller
+            // Ensure correct first-load state
+            var hasAnimated = sessionStorage.getItem('logoAnimated') === 'true';
+            if (hasAnimated) document.body.classList.remove('first-load');
+
+            // First load logo animation + enter transition
+            await logoAnimationOnce();
+
+            // Mount page controller
             var ns = getNamespace(data, 'next');
             await mountNamespace(ns, data.next.container, data);
-            transitionOut();
+
+            await animateEnter();
           },
           async leave(data) {
-            // Start overlay, stop triggers, unmount old controller
-            transitionIn();
             killGlobalScrollTriggers();
             unmountNamespace(getNamespace(data, 'current'));
 
-            // Small offset for nicer swap
-            await delay(CONFIG.transitionOffset);
+            // Play leave animation BEFORE we swap content
+            await animateLeave();
+
+            if (CONFIG.transitionOffset) await delay(CONFIG.transitionOffset);
           },
           async beforeEnter(data) {
-            // Reset Webflow interactions (optional)
             reinitWebflowIX2();
           },
           async enter(data) {
-            // Mount new controller then transition out
+            // Mount new controller then animate reveal
             var ns = getNamespace(data, 'next');
             await mountNamespace(ns, data.next.container, data);
-            transitionOut();
+
+            await animateEnter();
           },
           async after(data) {
-            // Always scroll to top after navigation (typical for Webflow sites)
             try { window.scrollTo(0, 0); } catch (_) {}
 
-            // Refresh ScrollTrigger if present
             if (window.ScrollTrigger && typeof window.ScrollTrigger.refresh === 'function') {
               try { window.ScrollTrigger.refresh(); } catch (_) {}
             }
