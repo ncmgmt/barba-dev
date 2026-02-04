@@ -44,6 +44,25 @@
   WFApp._instances = WFApp._instances || {}; // namespace -> instance
   WFApp._loadedScripts = WFApp._loadedScripts || new Set();
 
+  WFApp.loadCssOnce = function loadCssOnce(href) {
+    if (!href) return Promise.resolve();
+    WFApp._loadedCss = WFApp._loadedCss || new Set();
+    var loaded = WFApp._loadedCss;
+    var has = loaded instanceof Set ? loaded.has(href) : loaded[href];
+    if (has) return Promise.resolve();
+    if (loaded instanceof Set) loaded.add(href);
+    else loaded[href] = true;
+
+    return new Promise(function (resolve, reject) {
+      var l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = href;
+      l.onload = function () { resolve(); };
+      l.onerror = function (e) { reject(e); };
+      document.head.appendChild(l);
+    });
+  };
+
   WFApp.loadScriptOnce = function loadScriptOnce(src) {
     if (!src) return Promise.resolve();
 
@@ -239,7 +258,13 @@
           duration: 1.25,
           ease: 'power4.inOut',
           stagger: { amount: 0.2, from: 'random' }
-        }, '<');
+        }, '<')
+        .add(function () {
+          // Compatibility event (previous bw24 scripts relied on this)
+          try {
+            window.dispatchEvent(new CustomEvent('pageTransitionCompleted'));
+          } catch (_) {}
+        }, 0.5);
     });
   }
 
