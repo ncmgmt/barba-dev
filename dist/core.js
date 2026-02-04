@@ -352,6 +352,20 @@
     }
   }
 
+  // ---- Optional global hook file (dist/global.js) ----
+
+  function tryInitGlobalOnce() {
+    if (window.WFApp && window.WFApp.global && typeof window.WFApp.global.initOnce === 'function') {
+      try { window.WFApp.global.initOnce(); } catch (_) {}
+    }
+  }
+
+  function tryGlobalAfterEnter(data) {
+    if (window.WFApp && window.WFApp.global && typeof window.WFApp.global.afterEnter === 'function') {
+      try { window.WFApp.global.afterEnter(data); } catch (_) {}
+    }
+  }
+
   // ---- Barba init ----
 
   function init() {
@@ -365,6 +379,8 @@
         {
           name: 'default',
           async once(data) {
+            tryInitGlobalOnce();
+
             // Ensure correct first-load state
             var hasAnimated = sessionStorage.getItem('logoAnimated') === 'true';
             if (hasAnimated) document.body.classList.remove('first-load');
@@ -403,6 +419,8 @@
             if (window.ScrollTrigger && typeof window.ScrollTrigger.refresh === 'function') {
               try { window.ScrollTrigger.refresh(); } catch (_) {}
             }
+
+            tryGlobalAfterEnter(data);
           }
         }
       ]
