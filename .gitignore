@@ -1,0 +1,4 @@
+.DS_Store
+node_modules
+
+# If you later add a build step, keep sources separate
