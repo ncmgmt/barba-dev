@@ -670,10 +670,7 @@
         } catch (_) {}
       }, 0);
 
-      // initial run (in case finsweet already rendered)
-      // IMPORTANT: On Barba navigation, Finsweet may not emit renderitems.
-      // We must force items visible and replay the reveal animation on every init.
-      setTimeout(function () {
+      function runPortfolioReveal() {
         var items = container.querySelectorAll('.portfolio_cms_item');
         items.forEach(function (item) {
           item.style.visibility = 'visible';
@@ -718,7 +715,19 @@
 
         // ensure click/expand is bound
         initPortfolioInteractions(container);
-      }, 50);
+      }
+
+      // Run reveal AFTER the new page is actually revealed
+      var didRun = false;
+      function runOnce() {
+        if (didRun) return;
+        didRun = true;
+        runPortfolioReveal();
+      }
+      window.addEventListener('pageTransitionCompleted', runOnce, { once: true });
+
+      // Fallback: if event doesn't fire for some reason
+      setTimeout(runOnce, 1400);
 
       return {
         destroy: function () {

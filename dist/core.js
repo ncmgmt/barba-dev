@@ -239,6 +239,11 @@
 
       var tl = window.gsap.timeline({
         onComplete: function () {
+          // Fire compatibility event AFTER the new page is actually revealed.
+          try {
+            window.dispatchEvent(new CustomEvent('pageTransitionCompleted'));
+          } catch (_) {}
+
           hideTransition();
           unlockBody();
           resolve();
@@ -258,13 +263,7 @@
           duration: 1.25,
           ease: 'power4.inOut',
           stagger: { amount: 0.2, from: 'random' }
-        }, '<')
-        .add(function () {
-          // Compatibility event (previous bw24 scripts relied on this)
-          try {
-            window.dispatchEvent(new CustomEvent('pageTransitionCompleted'));
-          } catch (_) {}
-        }, 0.5);
+        }, '<');
     });
   }
 
@@ -399,7 +398,8 @@
     window.barba.init({
       debug: CONFIG.debug,
       timeout: 7000,
-      sync: true,
+      // sync=false ensures we never reveal before the DOM swap is complete
+      sync: false,
       transitions: [
         {
           name: 'default',
