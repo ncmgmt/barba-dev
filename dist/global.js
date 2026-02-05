@@ -261,12 +261,181 @@
     initDecodeUI(root || document);
   };
 
+  // ---- Blocks background (ported from bw24/blocks.js) ----
+
+  function bwCreateBlocksForContainer(container) {
+    if (!container || !window.gsap || !window.ScrollTrigger) return;
+
+    var reverse = container.getAttribute('data-mirror-vertical') === 'true';
+    var mirrorHorizontal = container.getAttribute('data-mirror-horizontal') === 'true';
+
+    var blockSizeRem = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--block--size'));
+    var rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    var blockSize = blockSizeRem * rootFontSize;
+
+    var containerWidth = container.clientWidth;
+    var containerHeight = container.clientHeight;
+    var numCols = Math.floor(containerWidth / blockSize);
+    var numRows = Math.floor(containerHeight / blockSize);
+    var numBlocks = numCols * numRows;
+
+    if (!numCols || !numRows || !numBlocks) return;
+
+    var opacityLevels = [0.2, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85];
+
+    var blockStartSpace = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--block--start-space'));
+    var startOffset = Math.max(0, Math.floor(blockStartSpace * rootFontSize) / (blockSize * numCols));
+
+    function calculateOpacity(row, col, adjustedCol, adjustedRow, numRows2, numCols2) {
+      var focusStartCol = numCols2 * 0.575;
+      var focusEndCol = numCols2 * 0.001;
+      var focusStartRow = numRows2 * 0.85;
+      var focusEndRow = numRows2 * 0.001;
+
+      var opacity = 0;
+
+      if (col < focusStartCol || col > focusEndCol || row < focusStartRow || row > focusEndRow) {
+        opacity = opacityLevels[Math.floor(Math.random() * 4)];
+      } else {
+        var randomIndex = 3 + Math.floor(Math.random() * (opacityLevels.length - 4));
+        opacity = opacityLevels[randomIndex];
+      }
+
+      var fadeOutIntensity = 0.25 + 2.4 * (Math.min(row / numRows2, 2 - row / numRows2) * Math.min(col / numCols2, 10 - col / numCols2));
+      opacity *= fadeOutIntensity;
+
+      // soft-edge zeros
+      var zeroOpacityStartCol = 0;
+      var zeroOpacityEndCol = numCols2 * Math.random() + 0.175;
+      var zeroOpacityStartRow = 0;
+      var zeroOpacityEndRow = numRows2 * Math.random() - 0.325;
+
+      if (col >= zeroOpacityStartCol && col <= zeroOpacityEndCol && row >= zeroOpacityStartRow && row <= zeroOpacityEndRow) {
+        var distanceFromEdge = Math.min(
+          adjustedCol - zeroOpacityStartCol,
+          zeroOpacityEndCol - adjustedCol * (adjustedCol / numCols2)
+        ) / (zeroOpacityEndCol - zeroOpacityStartCol);
+        var softEdgeFactor = Math.max(0, 1 - distanceFromEdge * 0.2575);
+        if (Math.random() < softEdgeFactor) opacity = 0;
+      }
+
+      return opacity;
+    }
+
+    function shuffleArray(array) {
+      for (var i = array.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = array[i];
+        array[i] = array[j];
+        array[j] = tmp;
+      }
+      return array;
+    }
+
+    // rebuild
+    container.innerHTML = '';
+
+    var blocks = [];
+    for (var i = 0; i < numBlocks; i++) {
+      var block = document.createElement('div');
+      block.classList.add('block');
+      block.dataset.index = String(i);
+
+      var row = Math.floor(i / numCols);
+      var col = i % numCols;
+
+      if (reverse) row = numRows - 1 - row;
+      if (mirrorHorizontal) col = numCols - 1 - col;
+
+      var adjustedCol = col - startOffset;
+      var adjustedRow = row - startOffset;
+
+      var opacity = calculateOpacity(row, col, adjustedCol, adjustedRow, numRows, numCols);
+      block.dataset.targetOpacity = opacity.toFixed(2);
+      block.style.opacity = '0';
+      block.style.left = (col * blockSize) + 'px';
+      block.style.top = (row * blockSize) + 'px';
+
+      blocks.push(block);
+      container.appendChild(block);
+    }
+
+    function animateBlocks() {
+      var shuffled = shuffleArray(blocks.slice());
+      shuffled.forEach(function (block, idx) {
+        var targetOpacity = parseFloat(block.dataset.targetOpacity);
+        window.gsap.to(block, {
+          autoAlpha: targetOpacity,
+          duration: 0.2,
+          delay: idx * 0.01,
+          ease: 'power1.out'
+        });
+      });
+    }
+
+    // kill previous trigger if any
+    if (container.__bwBlocksST) {
+      try { container.__bwBlocksST.kill(); } catch (_) {}
+      container.__bwBlocksST = null;
+    }
+
+    container.__bwBlocksST = window.ScrollTrigger.create({
+      trigger: container,
+      start: 'top bottom',
+      onEnter: function () { animateBlocks(); }
+    });
+
+    // initial animate if already in view
+    try {
+      if (container.getBoundingClientRect().top < window.innerHeight) animateBlocks();
+    } catch (_) {}
+  }
+
+  function bwCreateBlocksAll() {
+    if (!window.gsap || !window.ScrollTrigger) return;
+    var containers = document.querySelectorAll('[data-background="true"]');
+    containers.forEach(function (c) {
+      bwCreateBlocksForContainer(c);
+    });
+  }
+
+  var _bwPrevWindowWidth = window.innerWidth;
+  var _bwResizeRaf = 0;
+  function bwInstallBlocksOnce() {
+    if (WFApp._blocksInstalled) return;
+    WFApp._blocksInstalled = true;
+
+    window.addEventListener('resize', function () {
+      var w = window.innerWidth;
+      if (w === _bwPrevWindowWidth) return;
+      if (_bwResizeRaf) cancelAnimationFrame(_bwResizeRaf);
+      _bwResizeRaf = requestAnimationFrame(function () {
+        bwCreateBlocksAll();
+        _bwPrevWindowWidth = w;
+      });
+    });
+  }
+
+  // ---- Menu helpers ----
+  // We keep gsap_menu.js as an external global include for now.
+  // Under Barba we must ensure it closes before navigation.
+  WFApp.global.closeMenu = function closeMenu() {
+    var openBtn = document.querySelector('.nav_icon_wrap.nav-open');
+    if (openBtn) {
+      try { openBtn.click(); } catch (_) {}
+    }
+  };
+
   WFApp.global.initOnce = function initOnce() {
     if (didInit) return;
     didInit = true;
 
     ensureGlobals();
     initDecodeUI(document);
+
+    // blocks background
+    bwInstallBlocksOnce();
+    bwCreateBlocksAll();
   };
 
   WFApp.global.afterEnter = function afterEnter(data) {
@@ -275,6 +444,9 @@
     // Re-bind behaviors inside the newly swapped container when possible
     var root = (data && data.next && data.next.container) ? data.next.container : document;
     initDecodeUI(root);
+
+    // blocks background might live inside the swapped container
+    bwCreateBlocksAll();
 
     if (window.ScrollTrigger && typeof window.ScrollTrigger.refresh === 'function') {
       try { window.ScrollTrigger.refresh(); } catch (_) {}

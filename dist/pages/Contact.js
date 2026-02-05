@@ -182,7 +182,9 @@
     var ok = true;
 
     // standard fields
-    var inputs = stepEl.querySelectorAll('input.form_main_field_input, textarea.form_main_field_input, select.form_main_field_input');
+    // In Webflow, inputs may not consistently carry a shared class across steps.
+    // Validate all relevant fields in the current step.
+    var inputs = stepEl.querySelectorAll('input, textarea, select');
     inputs.forEach(function (input) {
       if (input.dataset.dirty === 'true' || input.dataset.dirty === undefined) {
         if (!isValidInput(input, !!showErrors)) ok = false;
@@ -336,6 +338,11 @@
         if (prevButton) prevButton.style.display = (step === 'start') ? 'none' : '';
         if (nextButton) nextButton.style.display = (step === 'message') ? 'none' : '';
         if (submitButton) submitButton.style.display = (step === 'message') ? '' : 'none';
+
+        // Ensure the CTA states are recomputed whenever visibility changes.
+        var currentStepEl = form.querySelector('.form_main_step[data-form-step="' + currentStep + '"]');
+        if (currentStepEl) updateNextButtonState(currentStepEl, nextButton);
+        if (messageField && submitButton) updateSubmitButtonState(messageField, submitButton);
       }
 
       function requireByName(stepElement, name) {

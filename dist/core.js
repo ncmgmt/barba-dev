@@ -218,10 +218,10 @@
     });
   }
 
-  function animateEnter() {
-    // Transition out: columns move up, content fades in
+  function animateEnter(nextContainer) {
+    // Transition out: columns move up, next container fades in
     return new Promise(function (resolve) {
-      var transitionWrap = qs(CONFIG.contentWrapSelector);
+      var transitionWrap = nextContainer || qs(CONFIG.contentWrapSelector);
       var pageTransition = qs(CONFIG.transitionWrapSelector);
       var cols = qsa(CONFIG.transitionColumnSelector);
       var fadeEl = qs(CONFIG.fadeContainSelector);
@@ -417,11 +417,25 @@
             var ns = getNamespace(data, 'next');
             await mountNamespace(ns, data.next.container, data);
 
-            await animateEnter();
+            await animateEnter(data.next && data.next.container);
           },
           async leave(data) {
+            // Close menu overlays before navigating (prevents visual flash + wrong layering)
+            try {
+              if (window.WFApp && window.WFApp.global && typeof window.WFApp.global.closeMenu === 'function') {
+                window.WFApp.global.closeMenu();
+              }
+            } catch (_) {}
+
             killGlobalScrollTriggers();
             unmountNamespace(getNamespace(data, 'current'));
+
+            // Hide current container immediately so we never show the old page after the leave animation.
+            try {
+              if (data && data.current && data.current.container) {
+                data.current.container.style.opacity = '0';
+              }
+            } catch (_) {}
 
             // Play leave animation BEFORE we swap content
             await animateLeave();
@@ -436,7 +450,7 @@
             var ns = getNamespace(data, 'next');
             await mountNamespace(ns, data.next.container, data);
 
-            await animateEnter();
+            await animateEnter(data.next && data.next.container);
           },
           async after(data) {
             try { window.scrollTo(0, 0); } catch (_) {}
