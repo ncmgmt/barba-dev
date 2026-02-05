@@ -671,13 +671,51 @@
       }, 0);
 
       // initial run (in case finsweet already rendered)
+      // IMPORTANT: On Barba navigation, Finsweet may not emit renderitems.
+      // We must force items visible and replay the reveal animation on every init.
       setTimeout(function () {
         var items = container.querySelectorAll('.portfolio_cms_item');
         items.forEach(function (item) {
           item.style.visibility = 'visible';
           item.classList.remove('cms-item-hidden');
+          item.classList.remove('cms-item-initial');
           if (window.PortfolioDecode) window.PortfolioDecode.addHoverAndClickEffect(item);
         });
+
+        // replay collection reveal/decode animation even without cmsload events
+        try {
+          if (window.gsap && window.PortfolioDecode) {
+            var delayIncrement = 0.075;
+            items.forEach(function (item, index) {
+              var decLineWrapper = item.querySelector('.layout_line_wrap');
+              var lineBg = item.querySelector('.item_line_base');
+              var lineFill = item.querySelector('.item_line_inner');
+              if (!decLineWrapper || !lineBg || !lineFill) return;
+
+              var decodeDate = item.querySelectorAll('.cms_item_text.is-date');
+              var decodeText = item.querySelectorAll('.cms_item_text.is-text');
+
+              var tl = window.gsap.timeline({
+                delay: index * delayIncrement,
+                defaults: { duration: 0.75, ease: 'power2.out' },
+                onComplete: function () { item.classList.remove('cms-item-initial'); }
+              });
+
+              decodeDate.forEach(function (el) {
+                tl.add(function () { window.PortfolioDecode.decodeEffect(el, window.PortfolioDecode.randomCharacterDate, 1700); }, 0);
+              });
+              decodeText.forEach(function (el) {
+                tl.add(function () { window.PortfolioDecode.decodeEffect(el, window.PortfolioDecode.randomCharacterTag, 1700); }, 0);
+              });
+
+              tl.fromTo(decLineWrapper, { xPercent: -100 }, { xPercent: 0 }, 0);
+              tl.fromTo(lineBg, { xPercent: -100, opacity: 1 }, { xPercent: 0, opacity: 1 }, 0);
+              tl.fromTo(lineFill, { xPercent: 0, opacity: 1 }, { xPercent: 150, opacity: 1 }, 0)
+                .to(lineFill, { xPercent: -100, opacity: 0 }, '>0');
+            });
+          }
+        } catch (_) {}
+
         // ensure click/expand is bound
         initPortfolioInteractions(container);
       }, 50);

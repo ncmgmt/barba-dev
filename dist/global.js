@@ -373,6 +373,89 @@
       });
     }
 
+    // ---- pointer hover highlight (ported from bw24/blocks.js; delegated per container) ----
+    var highlightTimeouts = container.__bwBlockHighlightTimeouts || new WeakMap();
+    container.__bwBlockHighlightTimeouts = highlightTimeouts;
+
+    function flashHighlight(el) {
+      if (!el) return;
+      el.classList.add('block_highlight');
+      var existing = highlightTimeouts.get(el);
+      if (existing) clearTimeout(existing);
+      highlightTimeouts.set(el, setTimeout(function () {
+        el.classList.remove('block_highlight');
+      }, 500));
+    }
+
+    function highlightRandomAtIndex(index, prevIndex) {
+      flashHighlight(container.children[index]);
+
+      var col0 = index % numCols;
+      var row0 = Math.floor(index / numCols);
+
+      var dx = 0;
+      var dy = 0;
+      if (typeof prevIndex === 'number' && isFinite(prevIndex)) {
+        dx = col0 - (prevIndex % numCols);
+        dy = row0 - Math.floor(prevIndex / numCols);
+      }
+
+      var sx = dx === 0 ? 0 : (dx > 0 ? 1 : -1);
+      var sy = dy === 0 ? 0 : (dy > 0 ? 1 : -1);
+
+      var candidates = [];
+      if (sx || sy) candidates.push(index + sx + sy * numCols);
+      if (sx) candidates.push(index + sx);
+      if (sy) candidates.push(index + sy * numCols);
+
+      for (var dr = -1; dr <= 1; dr++) {
+        for (var dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          candidates.push(index + dc + dr * numCols);
+        }
+      }
+
+      var seen = new Set();
+      for (var k = 0; k < candidates.length; k++) {
+        var nIndex = candidates[k];
+        if (seen.has(nIndex)) continue;
+        seen.add(nIndex);
+        if (nIndex < 0 || nIndex >= numBlocks) continue;
+        if (Math.abs((nIndex % numCols) - col0) > 1) continue;
+        flashHighlight(container.children[nIndex]);
+        break;
+      }
+    }
+
+    container.__bwBlocksMeta = { numCols: numCols, numRows: numRows, numBlocks: numBlocks };
+    container.__bwHighlightAtIndex = highlightRandomAtIndex;
+
+    if (!container.__bwBlocksPointerBound) {
+      container.__bwBlocksPointerBound = true;
+      var lastIndex = -1;
+      var pendingIndex = -1;
+      var rafId2 = 0;
+
+      container.addEventListener('pointermove', function (e) {
+        var blockEl = e.target && e.target.closest ? e.target.closest('.block') : null;
+        if (!blockEl) return;
+        var idx2 = Number(blockEl.dataset.index);
+        if (!isFinite(idx2) || idx2 === lastIndex) return;
+
+        pendingIndex = idx2;
+        if (rafId2) return;
+        rafId2 = requestAnimationFrame(function () {
+          rafId2 = 0;
+          var nextIndex = pendingIndex;
+          pendingIndex = -1;
+          var prev = lastIndex;
+          lastIndex = nextIndex;
+          var fn = container.__bwHighlightAtIndex;
+          if (typeof fn === 'function') fn(nextIndex, prev);
+        });
+      }, { passive: true });
+    }
+
     // kill previous trigger if any
     if (container.__bwBlocksST) {
       try { container.__bwBlocksST.kill(); } catch (_) {}
