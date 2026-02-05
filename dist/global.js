@@ -255,6 +255,12 @@
 
   // ---- Public hooks for core.js ----
 
+  // Allow page controllers / CMS loaders to re-bind hover/reveal behaviors
+  WFApp.global.rebind = function rebind(root) {
+    ensureGlobals();
+    initDecodeUI(root || document);
+  };
+
   WFApp.global.initOnce = function initOnce() {
     if (didInit) return;
     didInit = true;
