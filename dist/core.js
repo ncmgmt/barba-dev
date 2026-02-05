@@ -348,21 +348,37 @@
     if (!rootEl) return;
     if (!window.ScrollTrigger || typeof window.ScrollTrigger.getAll !== 'function') return;
 
+    function isElement(x) { return x && x.nodeType === 1; }
+
     try {
       window.ScrollTrigger.getAll().forEach(function (t) {
         try {
-          // Best-effort: only kill triggers whose trigger element lives inside the swapped container.
+          // Identify trigger element
           var trig = t && t.vars ? t.vars.trigger : null;
-          var el = null;
+          var triggerEl = null;
           if (typeof trig === 'string') {
-            el = rootEl.querySelector(trig);
-          } else if (trig && trig.nodeType === 1) {
-            el = trig;
+            triggerEl = rootEl.querySelector(trig);
+          } else if (isElement(trig)) {
+            triggerEl = trig;
           }
 
-          if (el && rootEl.contains(el)) {
-            t.kill();
+          // If we can't resolve trigger inside the outgoing container, skip.
+          if (!triggerEl || !rootEl.contains(triggerEl)) return;
+
+          // Extra safety: do NOT kill triggers whose animation targets live outside the outgoing container.
+          // This prevents killing global nav/menu ScrollTriggers that may use a trigger selector inside the container.
+          var anim = t.animation;
+          if (anim && typeof anim.targets === 'function') {
+            var targets = anim.targets() || [];
+            for (var i = 0; i < targets.length; i++) {
+              var target = targets[i];
+              if (isElement(target) && !rootEl.contains(target)) {
+                return; // keep this trigger
+              }
+            }
           }
+
+          t.kill();
         } catch (_) {}
       });
     } catch (_) {}
@@ -464,8 +480,9 @@
 
             if (CONFIG.transitionOffset) await delay(CONFIG.transitionOffset);
           },
-          async beforeEnter(data) {
-            reinitWebflowIX2();
+          async beforeEnter(/* data */) {
+            // Don't block the reveal with Webflow teardown/reinit.
+            // We'll reinit in `after` once the new container is visible.
           },
           async enter(data) {
             // Start mounting controller early but don't block the reveal.
@@ -482,6 +499,12 @@
           },
           async after(data) {
             try { window.scrollTo(0, 0); } catch (_) {}
+
+            // Re-init Webflow interactions after the new DOM is visible.
+            try {
+              // Defer one tick to reduce layout thrash during the transition.
+              setTimeout(function () { reinitWebflowIX2(); }, 0);
+            } catch (_) {}
 
             if (window.ScrollTrigger && typeof window.ScrollTrigger.refresh === 'function') {
               try { window.ScrollTrigger.refresh(); } catch (_) {}
