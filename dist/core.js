@@ -450,6 +450,8 @@
 
             // Let the swapped DOM paint before we animate reveal.
             await delay(0);
+            // Make sure Webflow IX2 is initialized for this DOM before we reveal it.
+            reinitWebflowIX2();
             await animateEnter(data.next && data.next.container);
 
             // Ensure controller is mounted before firing compatibility event.
@@ -481,8 +483,9 @@
             if (CONFIG.transitionOffset) await delay(CONFIG.transitionOffset);
           },
           async beforeEnter(/* data */) {
-            // Don't block the reveal with Webflow teardown/reinit.
-            // We'll reinit in `after` once the new container is visible.
+            // Re-init Webflow interactions BEFORE revealing the new container.
+            // This can take a few hundred ms; we keep the transition overlay up during this time.
+            reinitWebflowIX2();
           },
           async enter(data) {
             // Start mounting controller early but don't block the reveal.
@@ -491,6 +494,8 @@
 
             // Let the swapped DOM paint before we animate reveal.
             await delay(0);
+            // Make sure Webflow IX2 is initialized for this DOM before we reveal it.
+            reinitWebflowIX2();
             await animateEnter(data.next && data.next.container);
 
             // Ensure controller is mounted before firing compatibility event.
@@ -499,12 +504,6 @@
           },
           async after(data) {
             try { window.scrollTo(0, 0); } catch (_) {}
-
-            // Re-init Webflow interactions after the new DOM is visible.
-            try {
-              // Defer one tick to reduce layout thrash during the transition.
-              setTimeout(function () { reinitWebflowIX2(); }, 0);
-            } catch (_) {}
 
             if (window.ScrollTrigger && typeof window.ScrollTrigger.refresh === 'function') {
               try { window.ScrollTrigger.refresh(); } catch (_) {}
