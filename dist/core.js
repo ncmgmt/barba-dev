@@ -239,11 +239,6 @@
 
       var tl = window.gsap.timeline({
         onComplete: function () {
-          // Fire compatibility event AFTER the new page is actually revealed.
-          try {
-            window.dispatchEvent(new CustomEvent('pageTransitionCompleted'));
-          } catch (_) {}
-
           hideTransition();
           unlockBody();
           resolve();
@@ -413,11 +408,17 @@
             // First load logo animation + enter transition
             await logoAnimationOnce();
 
-            // Mount page controller
+            // Start mounting controller early but don't block the reveal.
             var ns = getNamespace(data, 'next');
-            await mountNamespace(ns, data.next.container, data);
+            var mountPromise = mountNamespace(ns, data.next.container, data);
 
+            // Let the swapped DOM paint before we animate reveal.
+            await delay(0);
             await animateEnter(data.next && data.next.container);
+
+            // Ensure controller is mounted before firing compatibility event.
+            await mountPromise;
+            try { window.dispatchEvent(new CustomEvent('pageTransitionCompleted')); } catch (_) {}
           },
           async leave(data) {
             // Close menu overlays before navigating (prevents visual flash + wrong layering)
@@ -446,11 +447,17 @@
             reinitWebflowIX2();
           },
           async enter(data) {
-            // Mount new controller then animate reveal
+            // Start mounting controller early but don't block the reveal.
             var ns = getNamespace(data, 'next');
-            await mountNamespace(ns, data.next.container, data);
+            var mountPromise = mountNamespace(ns, data.next.container, data);
 
+            // Let the swapped DOM paint before we animate reveal.
+            await delay(0);
             await animateEnter(data.next && data.next.container);
+
+            // Ensure controller is mounted before firing compatibility event.
+            await mountPromise;
+            try { window.dispatchEvent(new CustomEvent('pageTransitionCompleted')); } catch (_) {}
           },
           async after(data) {
             try { window.scrollTo(0, 0); } catch (_) {}
