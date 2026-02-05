@@ -34,7 +34,7 @@
     transitionOffset: 0,
 
     // Namespaces that exist (for safety)
-    namespaces: ['Home', 'Portfolio', 'Team', 'Insights', 'Contact', 'Imprint', 'Legal', 'PrivacyPolicy']
+    namespaces: ['Home', 'Portfolio', 'Team', 'Insights', 'Contact', 'Imprint', 'Legal', 'PrivacyPolicy', 'Summit']
   };
 
   // ---- WFApp global registry ----
