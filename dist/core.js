@@ -245,14 +245,18 @@
         }
       });
 
-      tl.from(transitionWrap || {}, {
-        opacity: 0,
-        duration: 1.3,
-        ease: 'power4.inOut',
-        onStart: function () {
-          if (fadeEl) fadeEl.style.opacity = '1';
+      // Fade the new container in quickly so we never see an empty background behind the columns.
+      tl.fromTo(transitionWrap || {},
+        { opacity: 0 },
+        {
+          opacity: 1,
+          duration: 0.35,
+          ease: 'power2.out',
+          onStart: function () {
+            if (fadeEl) fadeEl.style.opacity = '1';
+          }
         }
-      })
+      )
         .to(cols, {
           y: '-100vh',
           duration: 1.25,
@@ -340,12 +344,28 @@
     log('[WFApp] unmounted', ns);
   }
 
-  function killGlobalScrollTriggers() {
-    if (window.ScrollTrigger && typeof window.ScrollTrigger.getAll === 'function') {
-      try {
-        window.ScrollTrigger.getAll().forEach(function (t) { t.kill(); });
-      } catch (_) {}
-    }
+  function killScrollTriggersIn(rootEl) {
+    if (!rootEl) return;
+    if (!window.ScrollTrigger || typeof window.ScrollTrigger.getAll !== 'function') return;
+
+    try {
+      window.ScrollTrigger.getAll().forEach(function (t) {
+        try {
+          // Best-effort: only kill triggers whose trigger element lives inside the swapped container.
+          var trig = t && t.vars ? t.vars.trigger : null;
+          var el = null;
+          if (typeof trig === 'string') {
+            el = rootEl.querySelector(trig);
+          } else if (trig && trig.nodeType === 1) {
+            el = trig;
+          }
+
+          if (el && rootEl.contains(el)) {
+            t.kill();
+          }
+        } catch (_) {}
+      });
+    } catch (_) {}
   }
 
   function delay(ms) {
@@ -428,7 +448,8 @@
               }
             } catch (_) {}
 
-            killGlobalScrollTriggers();
+            // Kill only ScrollTriggers that belong to the outgoing container.
+            try { killScrollTriggersIn(data && data.current && data.current.container); } catch (_) {}
             unmountNamespace(getNamespace(data, 'current'));
 
             // Hide current container immediately so we never show the old page after the leave animation.
