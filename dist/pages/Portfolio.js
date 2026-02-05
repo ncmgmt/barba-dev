@@ -133,6 +133,9 @@
     function portfolioAddHoverAndClickEffect(item) {
       if (!(item instanceof Element)) return;
 
+      if (item.dataset.bwPortfolioHoverBound === 'true') return;
+      item.dataset.bwPortfolioHoverBound = 'true';
+
       item.addEventListener('mouseenter', function () {
         var textElements = item.querySelectorAll('[data-use-blocks="true"]');
         textElements.forEach(function (el) { portfolioHoverEffect(el); });
@@ -158,6 +161,239 @@
       randomCharacterTag: portfolioRandomCharacterTag,
       hoverEffect: portfolioHoverEffect,
       addHoverAndClickEffect: portfolioAddHoverAndClickEffect
+    };
+  }
+
+  // --- Portfolio item expand/click interactions (ported from bw24/portfolio-interaction_gsap.js) ---
+  function initPortfolioInteractions(container, onCleanup) {
+    if (!container || !window.gsap) return function () {};
+
+    var removeFns = [];
+
+    function qsa(sel, root) {
+      return Array.prototype.slice.call((root || container).querySelectorAll(sel));
+    }
+
+    function closeActiveItems(excludeItem) {
+      var items = qsa('.portfolio_cms_item');
+      items.forEach(function (item) {
+        if (excludeItem && item === excludeItem) return;
+        if (!item.classList.contains('active')) return;
+
+        item.classList.remove('active');
+        item.classList.remove('hover-top', 'hover-bottom');
+
+        var expandElement = item.querySelector('.cms_item_expand');
+        var imgElement = item.querySelector('[data-img-expand="true"]');
+        var innerLeftWrapElements = item.querySelectorAll('.item_inner_left_wrap > *');
+
+        var tl = window.gsap.timeline();
+        if (expandElement) tl.to(expandElement, { maxHeight: 0, duration: 0.5 });
+        if (imgElement) {
+          tl.to(imgElement, { clipPath: 'inset(0 0 100% 0)', opacity: 0, scale: 0.6, duration: 0.4 }, 0);
+        }
+        if (innerLeftWrapElements && innerLeftWrapElements.length) {
+          tl.to(innerLeftWrapElements, { y: -10, opacity: 0, duration: 0.4, stagger: 0.1 }, 0);
+        }
+
+        tl.eventCallback('onComplete', function () {
+          if (expandElement) expandElement.style.maxHeight = '';
+          if (imgElement) imgElement.style.height = '';
+          innerLeftWrapElements.forEach(function (el) { try { el.removeAttribute('style'); } catch (_) {} });
+        });
+      });
+    }
+
+    function getInitialTransform(imgElement) {
+      var computedStyle = window.getComputedStyle(imgElement);
+      return computedStyle.transform;
+    }
+
+    function handleExpandMouseMove(event) {
+      var expandElement = event.currentTarget;
+      var imgElement = expandElement.querySelector('.cms_item_img');
+      if (!imgElement) return;
+
+      var rect = expandElement.getBoundingClientRect();
+      var mouseX = (event.clientX - rect.left) / rect.width;
+      var mouseY = (event.clientY - rect.top) / rect.height;
+
+      var rotateY = mouseX * 4 - 6;
+      var rotateX = mouseY * -6 + 8;
+      var rotateZ = mouseY * 2 + 2;
+      var translateY = mouseX * 4 - 6;
+
+      window.gsap.to(imgElement, {
+        duration: 0.3,
+        ease: 'power2.out',
+        y: translateY,
+        rotationX: rotateX,
+        rotationY: rotateY,
+        rotationZ: rotateZ
+      });
+    }
+
+    function handleExpandMouseEnter(event) {
+      var expandElement = event.currentTarget;
+      var imgElement = expandElement.querySelector('.cms_item_img');
+      if (!imgElement) return;
+      window.gsap.to(imgElement, { duration: 0.5, ease: 'power2.out' });
+      expandElement.addEventListener('mousemove', handleExpandMouseMove);
+    }
+
+    function handleExpandMouseLeave(event) {
+      var expandElement = event.currentTarget;
+      var imgElement = expandElement.querySelector('.cms_item_img');
+      if (!imgElement) return;
+      window.gsap.to(imgElement, { duration: 0.5, ease: 'power2.out', transform: getInitialTransform(imgElement) });
+      expandElement.removeEventListener('mousemove', handleExpandMouseMove);
+    }
+
+    function updateExpandHeight(item) {
+      var expandElement = item.querySelector('.cms_item_expand');
+      if (item.classList.contains('active') && expandElement) {
+        expandElement.style.maxHeight = expandElement.scrollHeight + 'px';
+      }
+    }
+
+    function handleItemClick(event) {
+      var item = event.currentTarget;
+
+      if (document.body.classList.contains('animations-disabled')) {
+        event.preventDefault();
+        return;
+      }
+
+      if (event.target && event.target.closest && event.target.closest('.layout_footer_social')) return;
+
+      var isActive = item.classList.contains('active');
+      if (isActive) return; // bw24 prevented immediate close
+
+      closeActiveItems(item);
+      item.classList.add('active');
+
+      var expandElement = item.querySelector('.cms_item_expand');
+      var imgElement = item.querySelector('[data-img-expand="true"]');
+      var innerLeftWrapElements = item.querySelectorAll('.item_inner_left_wrap > *');
+
+      var tl = window.gsap.timeline();
+      if (expandElement) {
+        tl.to(expandElement, { maxHeight: expandElement.scrollHeight + 'px', duration: 0.5, ease: 'power2.out' });
+      }
+      if (imgElement) {
+        tl.to(imgElement, { clipPath: 'inset(0 0 0% 0)', opacity: 1, duration: 0.5, ease: 'power2.out', scale: 1 }, '<');
+      }
+      if (innerLeftWrapElements && innerLeftWrapElements.length) {
+        tl.fromTo(innerLeftWrapElements, { y: -10, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, stagger: 0.1 }, '-=0.5');
+      }
+
+      item.classList.remove('leave-top', 'leave-bottom');
+
+      updateExpandHeight(item);
+    }
+
+    function handleItemMouseEnter(event) {
+      var item = event.currentTarget;
+      if (document.body.classList.contains('animations-disabled')) return;
+      if (item.classList.contains('active')) return;
+
+      var rect = item.getBoundingClientRect();
+      var mouseY = event.clientY - rect.top;
+
+      if (mouseY < rect.height / 2) {
+        item.classList.add('hover-top');
+        item.classList.remove('hover-bottom', 'leave-top', 'leave-bottom');
+      } else {
+        item.classList.add('hover-bottom');
+        item.classList.remove('hover-top', 'leave-top', 'leave-bottom');
+      }
+    }
+
+    function handleItemMouseLeave(event) {
+      var item = event.currentTarget;
+      if (document.body.classList.contains('animations-disabled')) return;
+      if (item.classList.contains('active')) return;
+
+      var rect = item.getBoundingClientRect();
+      var mouseY = event.clientY - rect.top;
+
+      if (mouseY < rect.height / 2) {
+        item.classList.add('leave-top');
+        item.classList.remove('hover-top', 'hover-bottom', 'leave-bottom');
+      } else {
+        item.classList.add('leave-bottom');
+        item.classList.remove('hover-top', 'hover-bottom', 'leave-top');
+      }
+
+      setTimeout(function () {
+        item.classList.remove('leave-top', 'leave-bottom');
+      }, 450);
+    }
+
+    function bindItems() {
+      var items = qsa('.portfolio_cms_item');
+      var parentContainer = container.querySelector('.list_item_wrap');
+
+      closeActiveItems();
+
+      items.forEach(function (item) {
+        if (item.dataset.bwPortfolioItemBound === 'true') return;
+        item.dataset.bwPortfolioItemBound = 'true';
+
+        item.addEventListener('click', handleItemClick);
+        item.addEventListener('mouseenter', handleItemMouseEnter);
+        item.addEventListener('mouseleave', handleItemMouseLeave);
+
+        removeFns.push(function () {
+          try { item.removeEventListener('click', handleItemClick); } catch (_) {}
+          try { item.removeEventListener('mouseenter', handleItemMouseEnter); } catch (_) {}
+          try { item.removeEventListener('mouseleave', handleItemMouseLeave); } catch (_) {}
+        });
+
+        var expandElement = item.querySelector('.cms_item_expand');
+        if (expandElement && expandElement.dataset.bwPortfolioExpandBound !== 'true') {
+          expandElement.dataset.bwPortfolioExpandBound = 'true';
+          expandElement.addEventListener('mouseenter', handleExpandMouseEnter);
+          expandElement.addEventListener('mouseleave', handleExpandMouseLeave);
+
+          removeFns.push(function () {
+            try { expandElement.removeEventListener('mouseenter', handleExpandMouseEnter); } catch (_) {}
+            try { expandElement.removeEventListener('mouseleave', handleExpandMouseLeave); } catch (_) {}
+            try { expandElement.removeEventListener('mousemove', handleExpandMouseMove); } catch (_) {}
+          });
+        }
+
+        updateExpandHeight(item);
+      });
+
+      if (parentContainer && !parentContainer.dataset.bwPortfolioLeaveBound) {
+        parentContainer.dataset.bwPortfolioLeaveBound = 'true';
+        var onLeave = function () { closeActiveItems(); };
+        parentContainer.addEventListener('mouseleave', onLeave);
+        removeFns.push(function () { try { parentContainer.removeEventListener('mouseleave', onLeave); } catch (_) {} });
+      }
+    }
+
+    bindItems();
+
+    // Resize handler
+    var rafId = 0;
+    function onResize() {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(function () {
+        qsa('.portfolio_cms_item').forEach(function (item) { updateExpandHeight(item); });
+      });
+    }
+    window.addEventListener('resize', onResize);
+    removeFns.push(function () { window.removeEventListener('resize', onResize); });
+
+    if (typeof onCleanup === 'function') onCleanup(function () {
+      closeActiveItems();
+    });
+
+    return function destroy() {
+      removeFns.forEach(function (fn) { try { fn(); } catch (_) {} });
+      removeFns = [];
     };
   }
 
@@ -362,6 +598,11 @@
       });
 
       animateCollectionItems(root);
+
+      // bind expand/click interactions after items exist
+      if (WFApp._fsPortfolio && typeof WFApp._fsPortfolio.bindInteractions === 'function') {
+        WFApp._fsPortfolio.bindInteractions(root);
+      }
     }
 
     window.fsAttributes.push([
@@ -374,9 +615,7 @@
               var root = WFApp._fsPortfolio.currentContainer;
               if (!root) return;
               resetPortfolioItems(root);
-              setTimeout(function () {
-                initializePortfolioItems();
-              }, 100);
+              setTimeout(function () { initializePortfolioItems(); }, 100);
             });
           }
         }
@@ -414,6 +653,23 @@
       // setup filter menu animations + interactions
       var destroyFilter = initPortfolioFilter(container);
 
+      // interactions + cleanup
+      var cleanupFns = [];
+      var destroyInteractions = initPortfolioInteractions(container, function (fn) { cleanupFns.push(fn); });
+      WFApp._fsPortfolio.bindInteractions = function () {
+        // rebinding is safe thanks to data guards
+        initPortfolioInteractions(container);
+      };
+
+      // Try to re-init finsweet modules (best-effort) after Barba enter
+      setTimeout(function () {
+        try {
+          var fs = window.fsAttributes;
+          if (fs && fs.cmsload && typeof fs.cmsload.init === 'function') fs.cmsload.init();
+          if (fs && fs.cmsfilter && typeof fs.cmsfilter.init === 'function') fs.cmsfilter.init();
+        } catch (_) {}
+      }, 0);
+
       // initial run (in case finsweet already rendered)
       setTimeout(function () {
         var items = container.querySelectorAll('.portfolio_cms_item');
@@ -422,12 +678,22 @@
           item.classList.remove('cms-item-hidden');
           if (window.PortfolioDecode) window.PortfolioDecode.addHoverAndClickEffect(item);
         });
+        // ensure click/expand is bound
+        initPortfolioInteractions(container);
       }, 50);
 
       return {
         destroy: function () {
+          cleanupFns.forEach(function (fn) { try { fn(); } catch (_) {} });
+          cleanupFns = [];
+
           if (destroyFilter) destroyFilter();
-          if (WFApp._fsPortfolio) WFApp._fsPortfolio.currentContainer = null;
+          if (destroyInteractions) destroyInteractions();
+
+          if (WFApp._fsPortfolio) {
+            WFApp._fsPortfolio.currentContainer = null;
+            WFApp._fsPortfolio.bindInteractions = null;
+          }
         }
       };
     }
