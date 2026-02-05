@@ -239,9 +239,35 @@
 
       var tl = window.gsap.timeline({
         onComplete: function () {
-          hideTransition();
-          unlockBody();
-          resolve();
+          // Avoid a brief blank state: keep overlay up until the next container is actually visible.
+          try {
+            if (transitionWrap) {
+              transitionWrap.style.opacity = '1';
+              transitionWrap.style.visibility = 'visible';
+            }
+
+            var start = Date.now();
+            (function waitVisible() {
+              var ok = true;
+              try {
+                var op = transitionWrap ? parseFloat(getComputedStyle(transitionWrap).opacity) : 1;
+                ok = !(isFinite(op) && op <= 0.01);
+              } catch (_) {}
+
+              if (ok || Date.now() - start > 600) {
+                hideTransition();
+                unlockBody();
+                resolve();
+                return;
+              }
+              requestAnimationFrame(waitVisible);
+            })();
+            return;
+          } catch (_) {
+            hideTransition();
+            unlockBody();
+            resolve();
+          }
         }
       });
 

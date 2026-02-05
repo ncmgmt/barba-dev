@@ -519,6 +519,8 @@
     // blocks background
     bwInstallBlocksOnce();
     bwCreateBlocksAll();
+    // Ensure triggers evaluate immediately on first load (prevents blocks staying at opacity 0 until navigation)
+    try { if (window.ScrollTrigger && window.ScrollTrigger.refresh) window.ScrollTrigger.refresh(true); } catch (_) {}
   };
 
   WFApp.global.afterEnter = function afterEnter(data) {
@@ -532,7 +534,7 @@
     bwCreateBlocksAll();
 
     if (window.ScrollTrigger && typeof window.ScrollTrigger.refresh === 'function') {
-      try { window.ScrollTrigger.refresh(); } catch (_) {}
+      try { window.ScrollTrigger.refresh(true); } catch (_) {}
     }
   };
 
