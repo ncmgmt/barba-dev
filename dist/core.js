@@ -237,7 +237,7 @@
       lockBody();
       ensureTransitionVisible();
 
-      if (transitionWrap) window.gsap.set(transitionWrap, { opacity: 1 });
+      if (transitionWrap) window.gsap.set(transitionWrap, { opacity: 1, visibility: 'visible' });
 
       var tl = window.gsap.timeline({
         onComplete: function () {
@@ -429,6 +429,13 @@
     var Webflow = window.Webflow;
     if (!Webflow) return;
 
+    // Barba hooks can call this multiple times per navigation (once/beforeEnter/enter).
+    // Webflow.destroy/ready/ix2.init is not idempotent and can re-apply initial states,
+    // causing flicker + double animations. Throttle to at most once per tick.
+    if (WFApp._ix2ReinitLock) return;
+    WFApp._ix2ReinitLock = true;
+    setTimeout(function () { WFApp._ix2ReinitLock = false; }, 0);
+
     try {
       Webflow.destroy();
       Webflow.ready();
@@ -461,6 +468,35 @@
   function init() {
     assertBarba();
 
+    // Prevent double-initialization when core.js is included inside the Barba container.
+    // Double init causes duplicate transitions and can spiral into recursive hook execution.
+    if (WFApp._barbaInited) {
+      log('[WFApp] core init skipped (already initialized)');
+      return;
+    }
+    WFApp._barbaInited = true;
+
+    // Global safety: always close the main menu around navigations.
+    // (The menu toggle can ignore clicks while its GSAP timeline is active.)
+    try {
+      if (window.barba && window.barba.hooks) {
+        window.barba.hooks.beforeLeave(function () {
+          try {
+            if (window.WFApp && window.WFApp.global && typeof window.WFApp.global.closeMenu === 'function') {
+              window.WFApp.global.closeMenu({ immediate: true });
+            }
+          } catch (_) {}
+        });
+        window.barba.hooks.beforeEnter(function () {
+          try {
+            if (window.WFApp && window.WFApp.global && typeof window.WFApp.global.closeMenu === 'function') {
+              window.WFApp.global.closeMenu({ immediate: true });
+            }
+          } catch (_) {}
+        });
+      }
+    } catch (_) {}
+
     window.barba.init({
       debug: CONFIG.debug,
       timeout: 7000,
@@ -471,6 +507,17 @@
           name: 'default',
           async once(data) {
             tryInitGlobalOnce();
+
+            // On hard reload, Webflow may briefly paint content before IX2 applies initial states.
+            // Keep the overlay up and the container hidden until we explicitly reveal.
+            try {
+              ensureTransitionVisible();
+              lockBody();
+              if (data && data.next && data.next.container) {
+                data.next.container.style.opacity = '0';
+                data.next.container.style.visibility = 'hidden';
+              }
+            } catch (_) {}
 
             // Ensure correct first-load state
             var hasAnimated = sessionStorage.getItem('logoAnimated') === 'true';
@@ -497,12 +544,20 @@
             await mountPromise;
             // Old hook: after reveal + controller mount.
             try { window.dispatchEvent(new CustomEvent('pageTransitionCompleted')); } catch (_) {}
+
+            // Ensure final visibility
+            try {
+              if (data && data.next && data.next.container) {
+                data.next.container.style.opacity = '';
+                data.next.container.style.visibility = '';
+              }
+            } catch (_) {}
           },
           async leave(data) {
             // Close menu overlays before navigating (prevents visual flash + wrong layering)
             try {
               if (window.WFApp && window.WFApp.global && typeof window.WFApp.global.closeMenu === 'function') {
-                window.WFApp.global.closeMenu();
+                window.WFApp.global.closeMenu({ immediate: true });
               }
             } catch (_) {}
 
@@ -522,7 +577,16 @@
 
             if (CONFIG.transitionOffset) await delay(CONFIG.transitionOffset);
           },
-          async beforeEnter(/* data */) {
+          async beforeEnter(data) {
+            // Keep the incoming container hidden while Webflow IX2 applies initial states.
+            // If we reveal too early, IX2 can re-hide/re-animate elements => flicker/double animations.
+            try {
+              if (data && data.next && data.next.container) {
+                data.next.container.style.opacity = '0';
+                data.next.container.style.visibility = 'hidden';
+              }
+            } catch (_) {}
+
             // Re-init Webflow interactions BEFORE revealing the new container.
             // This can take a few hundred ms; we keep the transition overlay up during this time.
             reinitWebflowIX2();
@@ -534,8 +598,6 @@
 
             // Let the swapped DOM paint before we animate reveal.
             await delay(0);
-            // Make sure Webflow IX2 is initialized for this DOM before we reveal it.
-            reinitWebflowIX2();
 
             // New hook: DOM swapped + IX2 ready, overlay still up.
             try { window.dispatchEvent(new CustomEvent('pageTransitionBeforeReveal')); } catch (_) {}
@@ -546,6 +608,14 @@
             await mountPromise;
             // Old hook: after reveal + controller mount.
             try { window.dispatchEvent(new CustomEvent('pageTransitionCompleted')); } catch (_) {}
+
+            // Ensure final visibility (beforeEnter set it hidden to avoid IX2 flicker)
+            try {
+              if (data && data.next && data.next.container) {
+                data.next.container.style.opacity = '';
+                data.next.container.style.visibility = '';
+              }
+            } catch (_) {}
           },
           async after(data) {
             try { window.scrollTo(0, 0); } catch (_) {}

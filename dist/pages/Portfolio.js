@@ -278,7 +278,25 @@
 
       var tl = window.gsap.timeline();
       if (expandElement) {
-        tl.to(expandElement, { maxHeight: expandElement.scrollHeight + 'px', duration: 0.5, ease: 'power2.out' });
+        // Make open as smooth as close: force a numeric start height.
+        try {
+          expandElement.style.overflow = 'hidden';
+          if (!expandElement.style.maxHeight) expandElement.style.maxHeight = '0px';
+        } catch (_) {}
+
+        tl.fromTo(
+          expandElement,
+          { maxHeight: 0 },
+          {
+            maxHeight: expandElement.scrollHeight + 'px',
+            duration: 0.5,
+            ease: 'power2.out',
+            onComplete: function () {
+              // Keep numeric maxHeight so resize updates stay smooth.
+              try { expandElement.style.maxHeight = expandElement.scrollHeight + 'px'; } catch (_) {}
+            }
+          }
+        );
       }
       if (imgElement) {
         tl.to(imgElement, { clipPath: 'inset(0 0 0% 0)', opacity: 1, duration: 0.5, ease: 'power2.out', scale: 1 }, '<');
@@ -500,10 +518,27 @@
         }
       }
 
+      function animateFilterIcon(open) {
+        if (!window.gsap) return;
+        var topLine = filterContainer.querySelector('.filter_icon_line.is-top');
+        var midLine = filterContainer.querySelector('.filter_icon_line.is-mid');
+        var bottomLine = filterContainer.querySelector('.filter_icon_line.is-bottom');
+        if (open) {
+          if (topLine) window.gsap.to(topLine, { duration: 0.4, marginLeft: '10%', ease: 'expo.inOut' });
+          if (midLine) window.gsap.to(midLine, { duration: 0.4, marginLeft: '35%', ease: 'expo.inOut' });
+          if (bottomLine) window.gsap.to(bottomLine, { duration: 0.4, marginLeft: '60%', ease: 'expo.inOut' });
+        } else {
+          if (topLine) window.gsap.to(topLine, { duration: 0.4, marginLeft: '0%', ease: 'expo.inOut' });
+          if (midLine) window.gsap.to(midLine, { duration: 0.4, marginLeft: '0%', ease: 'expo.inOut' });
+          if (bottomLine) window.gsap.to(bottomLine, { duration: 0.4, marginLeft: '0%', ease: 'expo.inOut' });
+        }
+      }
+
       function openFilterMenu(open) {
         if (!portfolioFilterMenuEl.classList.contains('animating')) {
           portfolioFilterMenuEl.classList.add('animating');
           setMenuSize(open);
+          animateFilterIcon(open);
           setTimeout(function () { portfolioFilterMenuEl.classList.remove('animating'); }, 400);
         }
         filterHeadWrapEl.classList.toggle('filter-open', open);
@@ -514,8 +549,36 @@
         openFilterMenu(!filterHeadWrapEl.classList.contains('filter-open'));
       }
 
+      function onEnter() {
+        if (!window.gsap) return;
+        var filterLinkText = filterContainer.querySelector('.filter_link_text');
+        var topLine = filterContainer.querySelector('.filter_icon_line.is-top');
+        var midLine = filterContainer.querySelector('.filter_icon_line.is-mid');
+        var bottomLine = filterContainer.querySelector('.filter_icon_line.is-bottom');
+        if (filterLinkText) window.gsap.to(filterLinkText, { duration: 0.3, color: 'var(--swatch--brand)', ease: 'expo.inOut' });
+        if (topLine) window.gsap.to(topLine, { duration: 0.2, y: +1, ease: 'expo.inOut' });
+        if (midLine) window.gsap.to(midLine, { duration: 0.2, y: 0, ease: 'expo.inOut' });
+        if (bottomLine) window.gsap.to(bottomLine, { duration: 0.2, y: -1, ease: 'expo.inOut' });
+      }
+
+      function onLeave() {
+        if (!window.gsap) return;
+        var filterLinkText = filterContainer.querySelector('.filter_link_text');
+        var topLine = filterContainer.querySelector('.filter_icon_line.is-top');
+        var midLine = filterContainer.querySelector('.filter_icon_line.is-mid');
+        var bottomLine = filterContainer.querySelector('.filter_icon_line.is-bottom');
+        if (filterLinkText) window.gsap.to(filterLinkText, { duration: 0.3, color: 'var(--theme--text)', ease: 'expo.inOut' });
+        if (topLine) window.gsap.to(topLine, { duration: 0.2, y: 0, ease: 'expo.inOut' });
+        if (midLine) window.gsap.to(midLine, { duration: 0.2, y: 0, ease: 'expo.inOut' });
+        if (bottomLine) window.gsap.to(bottomLine, { duration: 0.2, y: 0, ease: 'expo.inOut' });
+      }
+
       filterButtonEl.addEventListener('click', onClick);
+      filterButtonEl.addEventListener('mouseenter', onEnter);
+      filterButtonEl.addEventListener('mouseleave', onLeave);
       destroyers.push(function () { filterButtonEl.removeEventListener('click', onClick); });
+      destroyers.push(function () { filterButtonEl.removeEventListener('mouseenter', onEnter); });
+      destroyers.push(function () { filterButtonEl.removeEventListener('mouseleave', onLeave); });
     });
 
     return function destroy() {

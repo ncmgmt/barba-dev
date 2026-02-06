@@ -707,6 +707,16 @@
       // Ensure global hover/reveal bindings on this page
       if (WFApp.global && typeof WFApp.global.rebind === 'function') WFApp.global.rebind(container);
 
+      // Finsweet Attributes (rangeslider) is DOMContentLoaded-driven in many setups.
+      // After a Barba swap we need to re-init it, otherwise handles won't bind.
+      window.fsAttributes = window.fsAttributes || [];
+      setTimeout(function () {
+        try {
+          var fs = window.fsAttributes;
+          if (fs && fs.rangeslider && typeof fs.rangeslider.init === 'function') fs.rangeslider.init();
+        } catch (_) {}
+      }, 0);
+
       return {
         destroy: function () {
           listeners.forEach(function (x) {

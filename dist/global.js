@@ -555,12 +555,89 @@
   // ---- Menu helpers ----
   // We keep gsap_menu.js as an external global include for now.
   // Under Barba we must ensure it closes before navigation.
-  WFApp.global.closeMenu = function closeMenu() {
+  //
+  // NOTE: The gsap_menu toggle ignores clicks while its GSAP timeline is active.
+  // During fast clicks + Barba navigation this means a naive "click the toggle" close
+  // can be dropped and the menu stays open across pages.
+  //
+  // closeMenu({ immediate: true }) force-hides the menu by resetting classes/styles.
+  WFApp.global.closeMenu = function closeMenu(opts) {
+    opts = opts || {};
+    var immediate = !!opts.immediate;
+
+    // Try the normal close path first (plays the reverse animation when possible)
     var openBtn = document.querySelector('.nav_icon_wrap.nav-open');
-    if (openBtn) {
-      try { openBtn.click(); } catch (_) {}
+    if (openBtn && !immediate) {
+      try { openBtn.click(); return; } catch (_) {}
     }
+
+    // Fallback: force-close (used for Barba leave hooks / capture-phase link clicks)
+    try {
+      Array.prototype.slice.call(document.querySelectorAll('.nav_icon_wrap.nav-open'))
+        .forEach(function (el) { try { el.classList.remove('nav-open'); } catch (_) {} });
+
+      // Hide menu overlay/wrap (these are global nav elements, not inside Barba containers)
+      Array.prototype.slice.call(document.querySelectorAll('.layout_menu_wrap'))
+        .forEach(function (el) { try { el.style.display = 'none'; } catch (_) {} });
+
+      // Best-effort: restore pointer events if the menu script enabled them
+      Array.prototype.slice.call(document.querySelectorAll('.layout_nav_wrap'))
+        .forEach(function (el) { try { el.style.pointerEvents = ''; } catch (_) {} });
+
+      // Optional: clear any body locking used by other menu implementations
+      try { document.body.style.overflow = ''; } catch (_) {}
+      try { document.body.style.position = ''; } catch (_) {}
+      try { document.body.style.width = ''; } catch (_) {}
+    } catch (_) {}
   };
+
+  // Close menu eagerly when clicking internal links inside the menu.
+  // Use capture phase so it runs before Barba/Webflow handlers.
+  function isProbablyInternalLink(a) {
+    if (!a || !a.getAttribute) return false;
+    var href = a.getAttribute('href') || '';
+    if (!href || href === '#' || href.indexOf('#') === 0) return false;
+    if (/^(mailto:|tel:|sms:|javascript:)/i.test(href)) return false;
+    if (a.hasAttribute('download')) return false;
+    var target = (a.getAttribute('target') || '').toLowerCase();
+    if (target && target !== '_self') return false;
+
+    try {
+      var url = new URL(href, window.location.href);
+      if (url.origin !== window.location.origin) return false;
+      return true;
+    } catch (_) {
+      // If URL parsing fails, assume relative links are internal
+      return href.indexOf('http') !== 0;
+    }
+  }
+
+  function installMenuLinkCloseOnce() {
+    if (WFApp._menuLinkCloseInstalled) return;
+    WFApp._menuLinkCloseInstalled = true;
+
+    document.addEventListener('click', function (e) {
+      // Ignore modified clicks (new tab, etc.)
+      if (e.defaultPrevented) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      var t = e.target;
+      var a = t && t.closest ? t.closest('a') : null;
+      if (!a) return;
+
+      // Only for clicks inside the menu UI
+      var inMenu = false;
+      try {
+        inMenu = !!(a.closest && (a.closest('.layout_menu_wrap') || a.closest('.nav_menu_contain') || a.closest('.nav_menu_base')));
+      } catch (_) {}
+      if (!inMenu) return;
+
+      if (!isProbablyInternalLink(a)) return;
+
+      // Force-close so we don't depend on the menu timeline accepting the click.
+      try { WFApp.global.closeMenu({ immediate: true }); } catch (_) {}
+    }, true);
+  }
 
   WFApp.global.initOnce = function initOnce() {
     if (didInit) return;
@@ -572,6 +649,10 @@
     // blocks background
     bwInstallBlocksOnce();
     bwCreateBlocksAll();
+
+    // menu: close on internal link clicks inside the menu (capture-phase)
+    installMenuLinkCloseOnce();
+
     // Ensure triggers evaluate immediately on first load (prevents blocks staying at opacity 0 until navigation)
     try { if (window.ScrollTrigger && window.ScrollTrigger.refresh) window.ScrollTrigger.refresh(true); } catch (_) {}
   };
