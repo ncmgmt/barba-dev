@@ -250,11 +250,18 @@
             (function waitVisible() {
               var ok = true;
               try {
-                var op = transitionWrap ? parseFloat(getComputedStyle(transitionWrap).opacity) : 1;
-                ok = !(isFinite(op) && op <= 0.01);
+                if (!transitionWrap) ok = true;
+                else {
+                  var cs = getComputedStyle(transitionWrap);
+                  var op = parseFloat(cs.opacity);
+                  var disp = cs.display;
+                  var vis = cs.visibility;
+                  var h = transitionWrap.getBoundingClientRect().height;
+                  ok = !(disp === 'none' || vis === 'hidden' || (isFinite(op) && op <= 0.01) || h < 2);
+                }
               } catch (_) {}
 
-              if (ok || Date.now() - start > 600) {
+              if (ok || Date.now() - start > 800) {
                 hideTransition();
                 unlockBody();
                 resolve();

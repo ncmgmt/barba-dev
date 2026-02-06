@@ -474,11 +474,46 @@
     } catch (_) {}
   }
 
+  function bwEnsureBlocksReady(container) {
+    if (!container) return;
+
+    // If container has no size yet on first paint (common on Webflow/IX2), wait for it.
+    if ((container.clientWidth || 0) > 0 && (container.clientHeight || 0) > 0) {
+      bwCreateBlocksForContainer(container);
+      return;
+    }
+
+    if (container.__bwBlocksRO) return;
+
+    try {
+      var ro = new ResizeObserver(function () {
+        if ((container.clientWidth || 0) > 0 && (container.clientHeight || 0) > 0) {
+          try { bwCreateBlocksForContainer(container); } catch (_) {}
+          try { ro.disconnect(); } catch (_) {}
+          container.__bwBlocksRO = null;
+        }
+      });
+      ro.observe(container);
+      container.__bwBlocksRO = ro;
+    } catch (_) {
+      // Fallback: poll a few times
+      var tries = 0;
+      var t = setInterval(function () {
+        tries++;
+        if ((container.clientWidth || 0) > 0 && (container.clientHeight || 0) > 0) {
+          clearInterval(t);
+          try { bwCreateBlocksForContainer(container); } catch (_) {}
+        }
+        if (tries > 30) clearInterval(t);
+      }, 100);
+    }
+  }
+
   function bwCreateBlocksAll() {
     if (!window.gsap || !window.ScrollTrigger) return;
     var containers = document.querySelectorAll('[data-background="true"]');
     containers.forEach(function (c) {
-      bwCreateBlocksForContainer(c);
+      bwEnsureBlocksReady(c);
     });
   }
 
