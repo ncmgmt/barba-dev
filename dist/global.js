@@ -640,10 +640,9 @@
       if (navLineEls[1]) tl.to(navLineEls[1], { duration: 0.5, opacity: 0, ease: 'none' }, '<');
       if (navLineEls[2]) tl.to(navLineEls[2], { duration: 0.5, rotate: -45, ease: 'none' }, '<');
       if (splitRightEl) {
-        var navCtaText = splitRightEl.querySelector('.nav_cta_text');
-        // bw24 used a delayed "from"; in a timeline this is more reliable as a position offset.
-        tl.from(splitRightEl, { duration: 0.4, opacity: 0, yPercent: 20, ease: 'power2.out' }, '+=0.45');
-        if (navCtaText) tl.from(navCtaText, { duration: 0.35, opacity: 0, yPercent: 20, ease: 'power2.out' }, '<');
+        // Match bw24 timing: start 0.45s after the segment that begins at '<'
+        // (bw24 used delay:0.45 while positioned at '<').
+        tl.from(splitRightEl, { duration: 0.4, opacity: 0, yPercent: 20, ease: 'power2.out' }, '<0.45');
       }
       if (mobileCtaEl) tl.from(mobileCtaEl, { duration: 0.5, borderTopColor: 'transparent', borderBottomColor: 'transparent', ease: 'power2.inOut' }, '<');
       if (navIconEls.length) tl.from(navIconEls, { duration: 0.15, opacity: 0, ease: 'none', yPercent: 20 });
@@ -657,11 +656,7 @@
         try { menuWrapEl.style.display = 'none'; } catch (_) {}
         // Clear CTA inline styles so subsequent opens start clean.
         try {
-          if (splitRightEl) {
-            if (window.gsap) window.gsap.set(splitRightEl, { clearProps: 'all' });
-            var t = splitRightEl.querySelector('.nav_cta_text');
-            if (t && window.gsap) window.gsap.set(t, { clearProps: 'all' });
-          }
+          if (splitRightEl && window.gsap) window.gsap.set(splitRightEl, { clearProps: 'all' });
         } catch (_) {}
       });
 
