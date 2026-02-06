@@ -641,9 +641,12 @@
       if (navLineEls[1]) tl.to(navLineEls[1], { duration: 0.5, opacity: 0, ease: 'none' }, '<');
       if (navLineEls[2]) tl.to(navLineEls[2], { duration: 0.5, rotate: -45, ease: 'none' }, '<');
       if (splitRightEl) {
+        // Prevent early visibility: keep CTA hidden from the start of the timeline,
+        // then animate it in at the bw24 timing point.
+        tl.set(splitRightEl, { opacity: 0, yPercent: 20 }, 0);
         // Match bw24 timing: start 0.45s after the segment that begins at '<'
         // (bw24 used delay:0.45 while positioned at '<').
-        tl.from(splitRightEl, { duration: 0.4, opacity: 0, yPercent: 20, ease: 'power2.out' }, '<0.45');
+        tl.to(splitRightEl, { duration: 0.4, opacity: 1, yPercent: 0, ease: 'power2.out' }, '<0.45');
       }
       if (mobileCtaEl) tl.from(mobileCtaEl, { duration: 0.5, borderTopColor: 'transparent', borderBottomColor: 'transparent', ease: 'power2.inOut' }, '<');
       if (navIconEls.length) tl.from(navIconEls, { duration: 0.15, opacity: 0, ease: 'none', yPercent: 20 });
