@@ -577,6 +577,25 @@
         Array.prototype.slice.call(document.querySelectorAll('.layout_menu_wrap'))
           .forEach(function (el) { try { el.style.display = 'none'; } catch (_) {} });
 
+        // Reset the hamburger/close icon lines so the button isn't stuck in the "X" state.
+        // (We can't access the gsap_menu.js timeline here, so we reset styles directly.)
+        if (window.gsap) {
+          try {
+            var navLines = document.querySelectorAll('.nav_icon_line');
+            if (navLines && navLines.length) {
+              window.gsap.set(navLines, { clearProps: 'all' });
+              window.gsap.set(navLines, { rotate: 0, opacity: 1, y: 0, scaleX: 1 });
+            }
+          } catch (_) {}
+        } else {
+          try {
+            Array.prototype.slice.call(document.querySelectorAll('.nav_icon_line')).forEach(function (l) {
+              l.style.transform = '';
+              l.style.opacity = '1';
+            });
+          } catch (_) {}
+        }
+
         // Restore pointer events / body styles
         Array.prototype.slice.call(document.querySelectorAll('.layout_nav_wrap'))
           .forEach(function (el) { try { el.style.pointerEvents = ''; } catch (_) {} });

@@ -734,6 +734,10 @@
       }, 0);
 
       function runPortfolioReveal() {
+        // Prevent double-run on first load / hard reload / cmsload edge cases
+        if (container && container.dataset && container.dataset.portfolioRevealDone === 'true') return;
+        if (container && container.dataset) container.dataset.portfolioRevealDone = 'true';
+
         var items = container.querySelectorAll('.portfolio_cms_item');
         items.forEach(function (item) {
           item.style.visibility = 'visible';
@@ -755,11 +759,15 @@
               var decodeDate = item.querySelectorAll('.cms_item_text.is-date');
               var decodeText = item.querySelectorAll('.cms_item_text.is-text');
 
+              // Kill any previous reveal timeline on this item (prevents double animation)
+              try { if (item.__bwRevealTL && item.__bwRevealTL.kill) item.__bwRevealTL.kill(); } catch (_) {}
+
               var tl = window.gsap.timeline({
                 delay: index * delayIncrement,
                 defaults: { duration: 0.75, ease: 'power2.out' },
                 onComplete: function () { item.classList.remove('cms-item-initial'); }
               });
+              item.__bwRevealTL = tl;
 
               decodeDate.forEach(function (el) {
                 tl.add(function () { window.PortfolioDecode.decodeEffect(el, window.PortfolioDecode.randomCharacterDate, 1700); }, 0);

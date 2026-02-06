@@ -238,6 +238,9 @@
       ensureTransitionVisible();
 
       if (transitionWrap) window.gsap.set(transitionWrap, { opacity: 1, visibility: 'visible' });
+      // Custom CSS sets [data-transition-contain='fade'] { opacity: 0 } by default.
+      // Keep it visible during and after transitions to avoid a blank/gap.
+      try { if (fadeEl) fadeEl.style.opacity = '1'; } catch (_) {}
 
       var tl = window.gsap.timeline({
         onComplete: function () {
