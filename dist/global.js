@@ -615,7 +615,8 @@
       flip(false);
 
       var tl = window.gsap.timeline({ paused: true });
-      tl.set(menuWrapEl, { display: 'block' });
+      // Webflow menu wrap is a flex container; keep correct layout when revealing
+      tl.set(menuWrapEl, { display: 'flex' });
       tl.from(menuBaseEl, {
         duration: 0.4,
         opacity: 0,
@@ -659,6 +660,9 @@
           if (splitRightEl && window.gsap) window.gsap.set(splitRightEl, { clearProps: 'all' });
         } catch (_) {}
       });
+
+      // Ensure a clean initial state (hidden until opened)
+      try { menuWrapEl.style.display = 'none'; } catch (_) {}
 
       function openMenu(open) {
         // Allow toggles even while active: stop current tween and play desired direction.
