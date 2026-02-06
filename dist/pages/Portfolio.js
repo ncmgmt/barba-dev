@@ -776,8 +776,7 @@
           }
         } catch (_) {}
 
-        // ensure click/expand is bound
-        initPortfolioInteractions(container);
+        // interactions are already bound during controller init; don't double-bind here
       }
 
       // Run reveal AFTER the new page is actually revealed

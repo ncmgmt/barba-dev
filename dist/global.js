@@ -560,35 +560,54 @@
   // During fast clicks + Barba navigation this means a naive "click the toggle" close
   // can be dropped and the menu stays open across pages.
   //
-  // closeMenu({ immediate: true }) force-hides the menu by resetting classes/styles.
+  // closeMenu(): tries to close with the menu's own animation first.
+  // If the menu timeline is mid-animation it may ignore the toggle click; in that case
+  // we force-close after a short timeout.
   WFApp.global.closeMenu = function closeMenu(opts) {
     opts = opts || {};
     var immediate = !!opts.immediate;
+    var forceAfterMs = (typeof opts.forceAfterMs === 'number') ? opts.forceAfterMs : 450;
 
-    // Try the normal close path first (plays the reverse animation when possible)
-    var openBtn = document.querySelector('.nav_icon_wrap.nav-open');
-    if (openBtn && !immediate) {
-      try { openBtn.click(); return; } catch (_) {}
+    function forceClose() {
+      try {
+        Array.prototype.slice.call(document.querySelectorAll('.nav_icon_wrap.nav-open'))
+          .forEach(function (el) { try { el.classList.remove('nav-open'); } catch (_) {} });
+
+        // Hide menu overlay/wrap (these are global nav elements, not inside Barba containers)
+        Array.prototype.slice.call(document.querySelectorAll('.layout_menu_wrap'))
+          .forEach(function (el) { try { el.style.display = 'none'; } catch (_) {} });
+
+        // Restore pointer events / body styles
+        Array.prototype.slice.call(document.querySelectorAll('.layout_nav_wrap'))
+          .forEach(function (el) { try { el.style.pointerEvents = ''; } catch (_) {} });
+
+        try { document.body.style.overflow = ''; } catch (_) {}
+        try { document.body.style.position = ''; } catch (_) {}
+        try { document.body.style.width = ''; } catch (_) {}
+      } catch (_) {}
     }
 
-    // Fallback: force-close (used for Barba leave hooks / capture-phase link clicks)
-    try {
-      Array.prototype.slice.call(document.querySelectorAll('.nav_icon_wrap.nav-open'))
-        .forEach(function (el) { try { el.classList.remove('nav-open'); } catch (_) {} });
+    if (immediate) {
+      forceClose();
+      return;
+    }
 
-      // Hide menu overlay/wrap (these are global nav elements, not inside Barba containers)
-      Array.prototype.slice.call(document.querySelectorAll('.layout_menu_wrap'))
-        .forEach(function (el) { try { el.style.display = 'none'; } catch (_) {} });
+    // Prefer the normal close path (plays the reverse animation when possible)
+    var openBtn = document.querySelector('.nav_icon_wrap.nav-open');
+    if (openBtn) {
+      try { openBtn.click(); } catch (_) {}
 
-      // Best-effort: restore pointer events if the menu script enabled them
-      Array.prototype.slice.call(document.querySelectorAll('.layout_nav_wrap'))
-        .forEach(function (el) { try { el.style.pointerEvents = ''; } catch (_) {} });
+      // Safety-net: if it didn't close (timeline ignored click), force-close.
+      setTimeout(function () {
+        try {
+          var stillOpen = !!document.querySelector('.nav_icon_wrap.nav-open');
+          if (stillOpen) forceClose();
+        } catch (_) {}
+      }, forceAfterMs);
+      return;
+    }
 
-      // Optional: clear any body locking used by other menu implementations
-      try { document.body.style.overflow = ''; } catch (_) {}
-      try { document.body.style.position = ''; } catch (_) {}
-      try { document.body.style.width = ''; } catch (_) {}
-    } catch (_) {}
+    // Nothing to close
   };
 
   // Close menu eagerly when clicking internal links inside the menu.
@@ -634,8 +653,8 @@
 
       if (!isProbablyInternalLink(a)) return;
 
-      // Force-close so we don't depend on the menu timeline accepting the click.
-      try { WFApp.global.closeMenu({ immediate: true }); } catch (_) {}
+      // Close with animation if possible; force-close only if the timeline drops the click.
+      try { WFApp.global.closeMenu({ immediate: false, forceAfterMs: 450 }); } catch (_) {}
     }, true);
   }
 

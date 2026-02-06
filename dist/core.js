@@ -483,14 +483,14 @@
         window.barba.hooks.beforeLeave(function () {
           try {
             if (window.WFApp && window.WFApp.global && typeof window.WFApp.global.closeMenu === 'function') {
-              window.WFApp.global.closeMenu({ immediate: true });
+              window.WFApp.global.closeMenu({ immediate: false, forceAfterMs: 450 });
             }
           } catch (_) {}
         });
         window.barba.hooks.beforeEnter(function () {
           try {
             if (window.WFApp && window.WFApp.global && typeof window.WFApp.global.closeMenu === 'function') {
-              window.WFApp.global.closeMenu({ immediate: true });
+              window.WFApp.global.closeMenu({ immediate: false, forceAfterMs: 450 });
             }
           } catch (_) {}
         });
@@ -548,8 +548,10 @@
             // Ensure final visibility
             try {
               if (data && data.next && data.next.container) {
-                data.next.container.style.opacity = '';
-                data.next.container.style.visibility = '';
+                // Do NOT clear to '' (Webflow/IX2 can have default hidden states).
+                // Force final visible state after transition.
+                data.next.container.style.opacity = '1';
+                data.next.container.style.visibility = 'visible';
               }
             } catch (_) {}
           },
@@ -557,7 +559,7 @@
             // Close menu overlays before navigating (prevents visual flash + wrong layering)
             try {
               if (window.WFApp && window.WFApp.global && typeof window.WFApp.global.closeMenu === 'function') {
-                window.WFApp.global.closeMenu({ immediate: true });
+                window.WFApp.global.closeMenu({ immediate: false, forceAfterMs: 450 });
               }
             } catch (_) {}
 
@@ -612,8 +614,8 @@
             // Ensure final visibility (beforeEnter set it hidden to avoid IX2 flicker)
             try {
               if (data && data.next && data.next.container) {
-                data.next.container.style.opacity = '';
-                data.next.container.style.visibility = '';
+                data.next.container.style.opacity = '1';
+                data.next.container.style.visibility = 'visible';
               }
             } catch (_) {}
           },
