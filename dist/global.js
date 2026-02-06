@@ -560,10 +560,210 @@
   // During fast clicks + Barba navigation this means a naive "click the toggle" close
   // can be dropped and the menu stays open across pages.
   //
-  // closeMenu(): tries to close with the menu's own animation first.
-  // If the menu timeline is mid-animation it may ignore the toggle click; in that case
-  // we force-close after a short timeout.
+  // ---- Menu (ported from bw24/gsap_menu.js; Barba-safe, no jQuery) ----
+  // This implementation replaces the external gsap_menu.js so we can control the menu
+  // from Barba transitions without desyncing the button state.
+  WFApp.menu = WFApp.menu || {};
+
+  function menuInitOnce() {
+    if (WFApp._menuInited) return;
+    WFApp._menuInited = true;
+
+    if (!window.gsap) return;
+
+    var navWraps = Array.prototype.slice.call(document.querySelectorAll('.layout_nav_wrap'));
+    if (!navWraps.length) return;
+
+    WFApp._menuInstances = [];
+
+    navWraps.forEach(function (wrap) {
+      var menuEl = wrap.querySelector('.nav_icon_wrap');
+      var navLineEls = Array.prototype.slice.call(wrap.querySelectorAll('.nav_icon_line'));
+      var menuContainEl = wrap.querySelector('.nav_menu_contain');
+      var flipItemEl = wrap.querySelector('.nav_icon_base');
+      var menuWrapEl = wrap.querySelector('.layout_menu_wrap');
+      var menuBaseEl = wrap.querySelector('.nav_menu_base');
+      var menuLinkEls = Array.prototype.slice.call(wrap.querySelectorAll('.nav_link'));
+      var menuImgEl = wrap.querySelector('.nav_visual_wrap');
+      var splitLeftEls = Array.prototype.slice.call(wrap.querySelectorAll('.nav_split_left'));
+      var splitRightEl = wrap.querySelector('.nav_cta_contain');
+      var navIconEls = Array.prototype.slice.call(wrap.querySelectorAll('.nav_icon_social'));
+      var mobileCtaEl = wrap.querySelector('.nav_mobile_cta');
+
+      if (!menuEl || !menuWrapEl || !menuBaseEl) return;
+
+      var isOpen = false;
+      var blocksCreated = false;
+
+      function flip(forwards) {
+        // Optional: Flip plugin for smooth re-parenting
+        if (!window.Flip || !flipItemEl || !menuContainEl) {
+          try {
+            if (flipItemEl) (forwards ? menuContainEl : menuEl).appendChild(flipItemEl);
+          } catch (_) {}
+          return;
+        }
+
+        try {
+          var state = window.Flip.getState(flipItemEl);
+          (forwards ? menuContainEl : menuEl).appendChild(flipItemEl);
+          window.Flip.from(state, { duration: 0.4 });
+        } catch (_) {}
+      }
+
+      // initial placement
+      flip(false);
+
+      var tl = window.gsap.timeline({ paused: true });
+      tl.set(menuWrapEl, { display: 'block' });
+      tl.from(menuBaseEl, {
+        duration: 0.4,
+        opacity: 0,
+        ease: 'none',
+        onStart: function () { flip(true); }
+      });
+      if (flipItemEl) {
+        tl.to(flipItemEl, { duration: 0.4, backgroundColor: 'var(--theme--footer)', ease: 'expo.inOut' }, '<');
+      }
+      if (menuLinkEls.length) {
+        tl.from(menuLinkEls, {
+          duration: 0.25,
+          opacity: 0,
+          yPercent: 80,
+          stagger: { amount: 0.2 },
+          onReverseComplete: function () { flip(false); }
+        });
+      }
+      if (splitLeftEls.length) tl.from(splitLeftEls, { duration: 0.15, opacity: 0, ease: 'power4.out', stagger: 0.1 }, '<');
+      if (menuImgEl) tl.from(menuImgEl, { duration: 0.65, opacity: 0, yPercent: 60 }, '<');
+      if (navLineEls[0]) tl.to(navLineEls[0], { duration: 0.5, rotate: 45, ease: 'none' }, '<');
+      if (navLineEls[1]) tl.to(navLineEls[1], { duration: 0.5, opacity: 0, ease: 'none' }, '<');
+      if (navLineEls[2]) tl.to(navLineEls[2], { duration: 0.5, rotate: -45, ease: 'none' }, '<');
+      if (splitRightEl) tl.from(splitRightEl, { duration: 0.4, opacity: 0, yPercent: 20, delay: 0.45 }, '<');
+      if (mobileCtaEl) tl.from(mobileCtaEl, { duration: 0.5, borderTopColor: 'transparent', borderBottomColor: 'transparent', ease: 'power2.inOut' }, '<');
+      if (navIconEls.length) tl.from(navIconEls, { duration: 0.15, opacity: 0, ease: 'none', yPercent: 20 });
+      tl.add(function () {
+        if (!blocksCreated) {
+          try { bwCreateBlocksAll(); } catch (_) {}
+          blocksCreated = true;
+        }
+      });
+      tl.eventCallback('onReverseComplete', function () {
+        try { menuWrapEl.style.display = 'none'; } catch (_) {}
+      });
+
+      function openMenu(open) {
+        // Allow toggles even while active: stop current tween and play desired direction.
+        try { tl.pause(); } catch (_) {}
+
+        if (open) {
+          isOpen = true;
+          menuEl.classList.add('nav-open');
+          try { wrap.style.pointerEvents = 'auto'; } catch (_) {}
+          try { menuWrapEl.style.display = 'block'; } catch (_) {}
+          tl.play(0);
+        } else {
+          isOpen = false;
+          menuEl.classList.remove('nav-open');
+          tl.reverse();
+        }
+      }
+
+      function toggle() {
+        openMenu(!menuEl.classList.contains('nav-open'));
+      }
+
+      // Hover animation for menu icon lines
+      if (navLineEls.length) {
+        menuEl.addEventListener('mouseenter', function () {
+          try {
+            if (navLineEls[0]) window.gsap.to(navLineEls[0], { duration: 0.3, y: 0.5, backgroundColor: 'var(--swatch--brand)', ease: 'power2.out' });
+            if (navLineEls[1]) window.gsap.to(navLineEls[1], { duration: 0.3, scaleX: 0.5, backgroundColor: 'var(--swatch--brand)', ease: 'power2.out' });
+            if (navLineEls[2]) window.gsap.to(navLineEls[2], { duration: 0.3, y: -0.5, backgroundColor: 'var(--swatch--brand)', ease: 'power2.out' });
+          } catch (_) {}
+        });
+        menuEl.addEventListener('mouseleave', function () {
+          try {
+            if (navLineEls[0]) window.gsap.to(navLineEls[0], { duration: 0.3, y: 0, backgroundColor: 'var(--theme--text)', ease: 'power2.in' });
+            if (navLineEls[1]) window.gsap.to(navLineEls[1], { duration: 0.3, scaleX: 1, backgroundColor: 'var(--theme--text)', ease: 'power2.in' });
+            if (navLineEls[2]) window.gsap.to(navLineEls[2], { duration: 0.3, y: 0, backgroundColor: 'var(--theme--text)', ease: 'power2.in' });
+          } catch (_) {}
+        });
+      }
+
+      menuEl.addEventListener('click', function (e) {
+        e.preventDefault();
+        toggle();
+      });
+
+      menuBaseEl.addEventListener('mouseenter', function () { openMenu(false); });
+      menuBaseEl.addEventListener('click', function () { openMenu(false); });
+
+      // Escape closes
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') openMenu(false);
+      });
+
+      window.addEventListener('resize', function () { blocksCreated = false; });
+
+      WFApp._menuInstances.push({ wrap: wrap, menuEl: menuEl, tl: tl, openMenu: openMenu, isOpen: function(){return menuEl.classList.contains('nav-open');} });
+    });
+
+    // Expose API
+    WFApp.menu.isOpen = function () {
+      try { return !!document.querySelector('.nav_icon_wrap.nav-open'); } catch (_) { return false; }
+    };
+
+    WFApp.menu.closeAll = function (opts) {
+      opts = opts || {};
+      var immediate = !!opts.immediate;
+      var durMs = (typeof opts.timeoutMs === 'number') ? opts.timeoutMs : 900;
+
+      return new Promise(function (resolve) {
+        if (!WFApp._menuInstances || !WFApp._menuInstances.length) return resolve();
+
+        var anyOpen = false;
+        WFApp._menuInstances.forEach(function (inst) {
+          try {
+            if (inst && inst.menuEl && inst.menuEl.classList.contains('nav-open')) {
+              anyOpen = true;
+              if (immediate) {
+                inst.menuEl.classList.remove('nav-open');
+                try { inst.tl.pause(0); inst.tl.reverse(0); } catch (_) {}
+                try { var mw = inst.wrap.querySelector('.layout_menu_wrap'); if (mw) mw.style.display = 'none'; } catch (_) {}
+              } else {
+                inst.openMenu(false);
+              }
+            }
+          } catch (_) {}
+        });
+
+        if (!anyOpen) return resolve();
+
+        // Resolve after reverse should have completed
+        setTimeout(resolve, durMs);
+      });
+    };
+
+    WFApp.menu.openFirst = function () {
+      try {
+        var inst = (WFApp._menuInstances || [])[0];
+        if (inst) inst.openMenu(true);
+      } catch (_) {}
+    };
+  }
+
+  // closeMenu() legacy API: delegate to our new menu implementation
   WFApp.global.closeMenu = function closeMenu(opts) {
+    opts = opts || {};
+    try { menuInitOnce(); } catch (_) {}
+    if (WFApp.menu && typeof WFApp.menu.closeAll === 'function') {
+      // match previous signature
+      var immediate2 = !!opts.immediate;
+      return WFApp.menu.closeAll({ immediate: immediate2 });
+    }
+
+    // Fallback (shouldn't happen)
     opts = opts || {};
     var immediate = !!opts.immediate;
     var forceAfterMs = (typeof opts.forceAfterMs === 'number') ? opts.forceAfterMs : 450;
@@ -573,60 +773,19 @@
         Array.prototype.slice.call(document.querySelectorAll('.nav_icon_wrap.nav-open'))
           .forEach(function (el) { try { el.classList.remove('nav-open'); } catch (_) {} });
 
-        // Hide menu overlay/wrap (these are global nav elements, not inside Barba containers)
         Array.prototype.slice.call(document.querySelectorAll('.layout_menu_wrap'))
           .forEach(function (el) { try { el.style.display = 'none'; } catch (_) {} });
-
-        // Reset the hamburger/close icon lines so the button isn't stuck in the "X" state.
-        // (We can't access the gsap_menu.js timeline here, so we reset styles directly.)
-        if (window.gsap) {
-          try {
-            var navLines = document.querySelectorAll('.nav_icon_line');
-            if (navLines && navLines.length) {
-              window.gsap.set(navLines, { clearProps: 'all' });
-              window.gsap.set(navLines, { rotate: 0, opacity: 1, y: 0, scaleX: 1 });
-            }
-          } catch (_) {}
-        } else {
-          try {
-            Array.prototype.slice.call(document.querySelectorAll('.nav_icon_line')).forEach(function (l) {
-              l.style.transform = '';
-              l.style.opacity = '1';
-            });
-          } catch (_) {}
-        }
-
-        // Restore pointer events / body styles
-        Array.prototype.slice.call(document.querySelectorAll('.layout_nav_wrap'))
-          .forEach(function (el) { try { el.style.pointerEvents = ''; } catch (_) {} });
-
-        try { document.body.style.overflow = ''; } catch (_) {}
-        try { document.body.style.position = ''; } catch (_) {}
-        try { document.body.style.width = ''; } catch (_) {}
       } catch (_) {}
     }
 
-    if (immediate) {
-      forceClose();
-      return;
-    }
-
-    // Prefer the normal close path (plays the reverse animation when possible)
+    if (immediate) return forceClose();
     var openBtn = document.querySelector('.nav_icon_wrap.nav-open');
     if (openBtn) {
       try { openBtn.click(); } catch (_) {}
-
-      // Safety-net: if it didn't close (timeline ignored click), force-close.
       setTimeout(function () {
-        try {
-          var stillOpen = !!document.querySelector('.nav_icon_wrap.nav-open');
-          if (stillOpen) forceClose();
-        } catch (_) {}
+        try { if (document.querySelector('.nav_icon_wrap.nav-open')) forceClose(); } catch (_) {}
       }, forceAfterMs);
-      return;
     }
-
-    // Nothing to close
   };
 
   // Close menu eagerly when clicking internal links inside the menu.
@@ -687,6 +846,9 @@
     // blocks background
     bwInstallBlocksOnce();
     bwCreateBlocksAll();
+
+    // menu: init the built-in menu controller (replaces external gsap_menu.js)
+    try { if (typeof menuInitOnce === 'function') menuInitOnce(); } catch (_) {}
 
     // menu: close on internal link clicks inside the menu (capture-phase)
     installMenuLinkCloseOnce();
