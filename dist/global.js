@@ -227,8 +227,8 @@
   function initDecodeUI(root) {
     root = root || document;
 
-    // Hover effects
-    Array.prototype.slice.call(root.querySelectorAll('[data-hover-effect="true"]'))
+    // Hover effects (bw24 uses data-animate-hover; keep both)
+    Array.prototype.slice.call(root.querySelectorAll('[data-hover-effect="true"], [data-animate-hover="true"]'))
       .forEach(addHoverAndClickEffect);
 
     // Reveal-on-load

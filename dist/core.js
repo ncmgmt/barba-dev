@@ -166,6 +166,9 @@
       cursor.setAttribute('font-size', '26');
       cursor.setAttribute('font-family', 'monospace');
       cursor.textContent = '_';
+      // Ensure required SVG attributes exist (prevents "Expected length, 'null'" errors)
+      cursor.setAttribute('x', '0');
+      cursor.setAttribute('y', '20');
       svg.appendChild(cursor);
 
       window.gsap.to(cursor, {
@@ -195,11 +198,10 @@
           y: baseY,
           duration: 0.05,
           ease: 'power1.inOut',
-          onUpdate: function () {
-            cursor.setAttribute('x', cursor.getAttribute('x'));
-            cursor.setAttribute('y', baseY);
-          },
           onComplete: function () {
+            // Keep SVG attributes in sync (Chrome can be strict about <text> x/y types)
+            try { cursor.setAttribute('x', String(bbox.x + bbox.width + 4)); } catch (_) {}
+            try { cursor.setAttribute('y', String(baseY)); } catch (_) {}
             window.gsap.to(p, {
               opacity: 1,
               fill: 'currentColor',
