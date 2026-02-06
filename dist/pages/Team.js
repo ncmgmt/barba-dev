@@ -8,152 +8,418 @@
     init: function ({ container }) {
       var ctx = null;
       var mm = null;
+      var mmBg = null;
       var splitInstances = [];
+      var listeners = [];
+      var st = [];
 
-      // Load SplitType (UMD) because bw24 version imported it as module
       var splitTypeUmd = 'https://cdn.jsdelivr.net/npm/split-type@0.3.4/umd/index.min.js';
 
-      function qsa(sel) { return Array.prototype.slice.call(container.querySelectorAll(sel)); }
-      function qs(sel) { return container.querySelector(sel); }
+      function on(el, ev, fn, opts) {
+        if (!el || !el.addEventListener) return;
+        el.addEventListener(ev, fn, opts);
+        listeners.push([el, ev, fn, opts]);
+      }
 
-      async function initTeam() {
-        await WFApp.loadScriptOnce(splitTypeUmd);
+      function qsa(sel, root) {
+        return Array.prototype.slice.call((root || container).querySelectorAll(sel));
+      }
 
-        if (!window.gsap || !window.ScrollTrigger || !window.SplitType) return;
+      function qs(sel, root) {
+        return (root || container).querySelector(sel);
+      }
 
-        ctx = window.gsap.context(function () {
-          // This is a reduced/Barba-safe adaptation of bw24/gsap_team_new.js.
-          // Original relied on window 'pageTransitionCompleted'. We already emit that event in core.
+      function applyDecodeOnce(el, useBlocks) {
+        if (!el) return;
+        if (el.dataset.hasAnimated === 'true') {
+          el.style.opacity = '1';
+          el.style.visibility = 'visible';
+          return;
+        }
 
-          var cardInfoPositions = window.gsap.utils.toArray('.card_info_position');
-          mm = window.gsap.matchMedia();
+        // Keep compatibility with bw24 behavior: hide until decode begins.
+        el.style.opacity = '0';
+        el.style.visibility = 'hidden';
 
-          mm.add({
-            isDesktop: '(min-width: 992px)',
-            isMobile: '(max-width: 991px)'
-          }, function () {
-            var teamTitle = qs('[data-ts="title"]');
-            var teamText = qs('[data-ts="text"]');
-            var jobTitle = qs('[data-js="title"]');
-            var jobText = qs('[data-js="text"]');
+        setTimeout(function () {
+          if (el.dataset.hasAnimated === 'true') return;
+          el.dataset.hasAnimated = 'true';
+          el.style.opacity = '1';
+          el.style.visibility = 'visible';
+          if (window.decodeEffect) {
+            var rand = window.randomCharacterTag || window.randomCharacterDigital;
+            window.decodeEffect(el, rand, 1700, useBlocks === true, 'forward', true);
+          }
+        }, 100);
+      }
 
-            if (!teamTitle || !teamText) return;
+      function initTeam() {
+        return (async function () {
+          await WFApp.loadScriptOnce(splitTypeUmd);
 
-            // Split titles
-            var splitTitle = new window.SplitType(teamTitle, { types: 'words', wordClass: 'word-y' });
-            splitInstances.push(splitTitle);
-            var titleWords = teamTitle.querySelectorAll('.word-y');
-            window.gsap.set(titleWords, { y: '100%', opacity: 0 });
+          if (!window.gsap || !window.ScrollTrigger || !window.SplitType) return;
+          try { window.gsap.registerPlugin(window.ScrollTrigger); } catch (_) {}
 
-            window.ScrollTrigger.create({
-              trigger: teamTitle,
-              start: 'top 80%',
-              end: 'bottom 20%',
-              scrub: true,
-              toggleActions: 'play none none reverse',
-              onEnter: function () {
-                window.gsap.to(titleWords, {
+          ctx = window.gsap.context(function () {
+            var gsap = window.gsap;
+            var ScrollTrigger = window.ScrollTrigger;
+
+            var cardInfoPositions = gsap.utils.toArray('.card_info_position');
+
+            mm = gsap.matchMedia();
+
+            mm.add({
+              isDesktop: '(min-width: 992px)',
+              isMobile: '(max-width: 991px)',
+              reduceMotion: '(prefers-reduced-motion: reduce)'
+            }, function () {
+              var teamTitle = qs('[data-ts="title"]');
+              var teamText = qs('[data-ts="text"]');
+
+              var teamCards = qsa('[data-ts="card"]');
+              var teamCardImgs = qsa('[data-ts="img"]');
+              var teamCardInfos = qsa('[data-ts="info"]');
+              var teamInfos = qsa('[data-ts="cardInfo"]');
+              var teamSocials = qsa('[data-ts="social"]');
+
+              var jobTitle = qs('[data-js="title"]');
+              var jobText = qs('[data-js="text"]');
+              var jobCards = qsa('[data-js="card"]');
+
+              // Initial hidden state for inner elements
+              gsap.set([teamInfos, teamSocials], { opacity: 0, y: 30 });
+              gsap.set(teamCardInfos, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
+              gsap.set(cardInfoPositions, { opacity: 0 });
+
+              // Title split + reveal
+              if (teamTitle) {
+                var splitTitle = new window.SplitType(teamTitle, { types: 'words', wordClass: 'word-y' });
+                splitInstances.push(splitTitle);
+                var titleWords = teamTitle.querySelectorAll('.word-y');
+                gsap.set(titleWords, { y: '100%', opacity: 0 });
+
+                st.push(ScrollTrigger.create({
+                  trigger: teamTitle,
+                  start: 'top 80%',
+                  end: 'bottom 20%',
+                  scrub: true,
+                  toggleActions: 'play none none reverse',
+                  preventOverlaps: true,
+                  onEnter: function () {
+                    gsap.to(titleWords, {
+                      y: '0%',
+                      opacity: 1,
+                      stagger: 0.2,
+                      duration: 0.6,
+                      ease: 'power4.out'
+                    });
+                  },
+                  onLeaveBack: function (self) {
+                    gsap.to(titleWords, {
+                      opacity: self.progress,
+                      ease: 'power4.out',
+                      duration: 0
+                    });
+                  }
+                }));
+
+                // Fade out on scroll-up
+                st.push(ScrollTrigger.create({
+                  trigger: teamTitle,
+                  start: 'clamp(top 5%)',
+                  end: 'top 0%',
+                  scrub: true,
+                  onUpdate: function (self) {
+                    gsap.to(teamTitle, { autoAlpha: 1 - self.progress, duration: 0 });
+                  }
+                }));
+              }
+
+              if (teamText) {
+                gsap.fromTo(teamText,
+                  { clipPath: 'inset(100% 0% 0% 0%)', autoAlpha: 0 },
+                  {
+                    clipPath: 'inset(0% 0% 0% 0%)',
+                    autoAlpha: 1,
+                    duration: 0.8,
+                    ease: 'power2.out',
+                    scrollTrigger: {
+                      trigger: teamText,
+                      start: 'top 80%',
+                      end: 'bottom 50%',
+                      toggleActions: 'play none none reverse'
+                    }
+                  }
+                );
+
+                st.push(ScrollTrigger.create({
+                  trigger: teamText,
+                  start: 'top 5%',
+                  end: 'top 0%',
+                  scrub: true,
+                  onUpdate: function (self) {
+                    gsap.to(teamText, { autoAlpha: 1 - self.progress, duration: 0 });
+                  }
+                }));
+              }
+
+              // Job title/text
+              if (jobTitle) {
+                var splitJobTitle = new window.SplitType(jobTitle, { types: 'words', wordClass: 'word-j' });
+                splitInstances.push(splitJobTitle);
+                var jobTitleWords = jobTitle.querySelectorAll('.word-j');
+                gsap.set(jobTitleWords, { y: '100%', opacity: 0 });
+
+                gsap.to(jobTitleWords, {
                   y: '0%',
                   opacity: 1,
                   stagger: 0.2,
                   duration: 0.6,
-                  ease: 'power4.out'
-                });
-              },
-              onLeaveBack: function (self) {
-                window.gsap.to(teamTitle, { autoAlpha: self.progress, duration: 0 });
-              }
-            });
-
-            window.gsap.fromTo(teamText,
-              { clipPath: 'inset(100% 0% 0% 0%)', autoAlpha: 0 },
-              {
-                clipPath: 'inset(0% 0% 0% 0%)',
-                autoAlpha: 1,
-                duration: 0.8,
-                ease: 'power2.out',
-                scrollTrigger: {
-                  trigger: teamText,
-                  start: 'top 80%',
-                  end: 'bottom 50%',
-                  toggleActions: 'play none none reverse'
-                }
-              }
-            );
-
-            // Job section (optional)
-            if (jobTitle && jobText) {
-              var splitJobTitle = new window.SplitType(jobTitle, { types: 'words', wordClass: 'word-j' });
-              splitInstances.push(splitJobTitle);
-              var jobTitleWords = jobTitle.querySelectorAll('.word-j');
-              window.gsap.set(jobTitleWords, { y: '100%', opacity: 0 });
-              window.gsap.to(jobTitleWords, {
-                y: '0%',
-                opacity: 1,
-                stagger: 0.2,
-                duration: 0.6,
-                ease: 'power4.out',
-                scrollTrigger: {
-                  trigger: jobTitle,
-                  start: 'top 85%',
-                  end: 'bottom 55%',
-                  toggleActions: 'play none none reverse'
-                }
-              });
-
-              window.gsap.fromTo(jobText,
-                { clipPath: 'inset(100% 0% 0% 0%)', autoAlpha: 0 },
-                {
-                  clipPath: 'inset(0% 0% 0% 0%)',
-                  autoAlpha: 1,
-                  duration: 0.8,
-                  ease: 'power2.out',
+                  ease: 'power4.out',
                   scrollTrigger: {
-                    trigger: jobText,
+                    trigger: jobTitle,
                     start: 'top 85%',
                     end: 'bottom 55%',
                     toggleActions: 'play none none reverse'
                   }
+                });
+
+                st.push(ScrollTrigger.create({
+                  trigger: jobTitle,
+                  start: 'clamp(top 5%)',
+                  end: 'bottom 0%',
+                  scrub: true,
+                  onUpdate: function (self) {
+                    gsap.to(jobTitle, { autoAlpha: 1 - self.progress, duration: 0 });
+                  }
+                }));
+              }
+
+              if (jobText) {
+                gsap.fromTo(jobText,
+                  { clipPath: 'inset(100% 0% 0% 0%)', autoAlpha: 0 },
+                  {
+                    clipPath: 'inset(0% 0% 0% 0%)',
+                    autoAlpha: 1,
+                    duration: 0.8,
+                    ease: 'power2.out',
+                    scrollTrigger: {
+                      trigger: jobText,
+                      start: 'top 85%',
+                      end: 'bottom 55%',
+                      toggleActions: 'play none none reverse'
+                    }
+                  }
+                );
+
+                st.push(ScrollTrigger.create({
+                  trigger: jobText,
+                  start: 'top 5%',
+                  end: 'bottom 0%',
+                  scrub: true,
+                  onUpdate: function (self) {
+                    gsap.to(jobText, { autoAlpha: 1 - self.progress, duration: 0 });
+                  }
+                }));
+              }
+
+              // Job cards
+              if (jobCards && jobCards.length) {
+                jobCards.forEach(function (card) {
+                  gsap.set(card, { autoAlpha: 0, clipPath: 'inset(100% 0% 0% 0%)' });
+
+                  gsap.to(card, {
+                    autoAlpha: 1,
+                    clipPath: 'inset(0% 0% 0% 0%)',
+                    duration: 0.8,
+                    ease: 'power2.out',
+                    scrollTrigger: {
+                      trigger: card,
+                      start: 'top 80%',
+                      end: 'bottom 50%',
+                      toggleActions: 'play none none reverse'
+                    }
+                  });
+
+                  st.push(ScrollTrigger.create({
+                    trigger: card,
+                    start: 'top 5%',
+                    end: 'bottom 5%',
+                    scrub: false,
+                    onUpdate: function (self) {
+                      gsap.to(card, { autoAlpha: 1 - self.progress, duration: 0 });
+                    }
+                  }));
+                });
+              }
+
+              // Team cards: reveal + info + click toggle of cardInfo
+              var activeCardInfo = null;
+
+              teamCards.forEach(function (card) {
+                gsap.set(card, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
+              });
+
+              function openCardInfo(cardInfo) {
+                gsap.to(cardInfo, {
+                  opacity: 1,
+                  clipPath: 'inset(-5% -5% -5% -5%)',
+                  duration: 0.5,
+                  ease: 'power2.out'
+                });
+              }
+
+              function closeCardInfo(cardInfo) {
+                gsap.to(cardInfo, {
+                  opacity: 0,
+                  clipPath: 'inset(100% 0% 0% 0%)',
+                  duration: 0.5,
+                  ease: 'power2.in'
+                });
+              }
+
+              teamCards.forEach(function (card, index) {
+                var tl = gsap.timeline({
+                  scrollTrigger: {
+                    trigger: card,
+                    start: 'top 80%',
+                    end: 'bottom 20%',
+                    toggleActions: 'play none none reverse'
+                  }
+                });
+
+                tl.fromTo(card,
+                  { clipPath: 'inset(100% 0 0 0)', opacity: 0 },
+                  { clipPath: 'inset(0% 0 0 0)', opacity: 1, duration: 1, ease: 'power2.out' }
+                )
+                  .to([teamInfos[index], teamSocials[index]],
+                    { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' },
+                    '-=0.5'
+                  )
+                  .add(function () {
+                    var pos = teamInfos[index] ? teamInfos[index].querySelector('.card_info_position') : null;
+                    if (pos) applyDecodeOnce(pos, false);
+                  });
+
+                // Fade-out when card reaches top
+                st.push(ScrollTrigger.create({
+                  trigger: card,
+                  start: 'top 5%',
+                  end: 'top 0%',
+                  scrub: true,
+                  onEnter: function () {
+                    gsap.to(card, { opacity: 0, duration: 0.5, ease: 'power2.out' });
+                  },
+                  onLeaveBack: function () {
+                    gsap.to(card, { opacity: 1, duration: 0.5, ease: 'power2.out' });
+                  }
+                }));
+
+                // Click toggle
+                var img = teamCardImgs[index];
+                var info = teamCardInfos[index];
+                if (img && info) {
+                  on(img, 'click', function () {
+                    if (activeCardInfo && activeCardInfo !== info) {
+                      closeCardInfo(activeCardInfo);
+                    }
+
+                    var op = gsap.getProperty(info, 'opacity');
+                    if (Number(op) === 0) {
+                      openCardInfo(info);
+                      activeCardInfo = info;
+                    } else {
+                      closeCardInfo(info);
+                      activeCardInfo = null;
+                    }
+                  });
+
+                  // Close active card when it leaves viewport
+                  st.push(ScrollTrigger.create({
+                    trigger: card,
+                    start: 'bottom bottom',
+                    end: 'top top',
+                    onLeave: function () {
+                      if (activeCardInfo === info) {
+                        closeCardInfo(info);
+                        activeCardInfo = null;
+                      }
+                    }
+                  }));
                 }
-              );
-            }
+              });
 
-            // Initial hidden states that exist in bw24
-            var teamInfos = qsa('[data-ts="cardInfo"]');
-            var teamSocials = qsa('[data-ts="social"]');
-            var teamCardInfos = qsa('[data-ts="info"]');
+              // Background gradient differences
+              mmBg = gsap.matchMedia();
+              mmBg.add('(max-width: 1440px)', function () {
+                teamCardInfos.forEach(function (info) {
+                  gsap.set(info, {
+                    backgroundImage: 'linear-gradient(180deg, #ffffffbf, var(--theme--card-bg) 90%)'
+                  });
+                });
+              });
 
-            window.gsap.set([teamInfos, teamSocials], { opacity: 0, y: 30 });
-            window.gsap.set(teamCardInfos, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
-            window.gsap.set(cardInfoPositions, { opacity: 0 });
-          });
+              mmBg.add('(min-width: 1441px)', function () {
+                teamCardInfos.forEach(function (info) {
+                  gsap.set(info, {
+                    backgroundImage: 'linear-gradient(180deg, var(--theme--card-bg), var(--theme--card-bg) 90%)'
+                  });
+                });
+              });
 
-        }, container);
+              // Resize behavior: keep decoded labels visible
+              function resetOnResize() {
+                cardInfoPositions.forEach(function (position) {
+                  if (position && position.dataset.hasAnimated === 'true') {
+                    position.style.opacity = '1';
+                    position.style.visibility = 'visible';
+                  }
+                });
+              }
+              on(window, 'resize', resetOnResize);
+            });
+
+          }, container);
+        })();
       }
 
-      // Start after transition event (keeps same behavior as before)
-      function onTransitionDone() {
+      var started = false;
+      function startOnce() {
+        if (started) return;
+        started = true;
         initTeam();
       }
-      window.addEventListener('pageTransitionCompleted', onTransitionDone, { once: true });
 
-      // Fallback if event already happened
-      setTimeout(function () {
-        if (!ctx) initTeam();
-      }, 600);
+      window.addEventListener('pageTransitionCompleted', startOnce, { once: true });
+      setTimeout(function () { startOnce(); }, 650);
 
       return {
         destroy: function () {
-          window.removeEventListener('pageTransitionCompleted', onTransitionDone);
+          window.removeEventListener('pageTransitionCompleted', startOnce);
+
+          listeners.forEach(function (x) {
+            try { x[0].removeEventListener(x[1], x[2], x[3]); } catch (_) {}
+          });
+          listeners = [];
+
+          if (mmBg) {
+            try { mmBg.kill(); } catch (_) {}
+            mmBg = null;
+          }
+
           if (mm) {
             try { mm.kill(); } catch (_) {}
             mm = null;
           }
+
+          st.forEach(function (t) { try { t.kill(); } catch (_) {} });
+          st = [];
+
           if (ctx) {
             try { ctx.revert(); } catch (_) {}
             ctx = null;
           }
-          // SplitType cleanup
+
           splitInstances.forEach(function (s) { try { s.revert(); } catch (_) {} });
           splitInstances = [];
         }

@@ -4,21 +4,19 @@
   var WFApp = (window.WFApp = window.WFApp || {});
   WFApp.pages = WFApp.pages || {};
 
-  // Contact: multi-step form logic (ported from bw24/form_contact*.js)
-  // Notes:
-  // - Barba-safe: no DOMContentLoaded; all selectors scoped to the swapped container.
-  // - Requires: gsap (for step transitions). jQuery optional (we avoid it here).
+  // Contact: multi-step form logic (ported from bw24/form_contact.js + form_contact_functions.js)
+  // Barba-safe: all bindings scoped to the swapped container, with destroy cleanup.
 
   function isTouchDevice() {
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   }
 
-  function qs(container, sel) {
-    return container ? container.querySelector(sel) : null;
+  function qs(root, sel) {
+    return root ? root.querySelector(sel) : null;
   }
 
-  function qsa(container, sel) {
-    return container ? Array.prototype.slice.call(container.querySelectorAll(sel)) : [];
+  function qsa(root, sel) {
+    return root ? Array.prototype.slice.call(root.querySelectorAll(sel)) : [];
   }
 
   function todayISO() {
@@ -55,7 +53,10 @@
   }
 
   function showTooltip(element, message, isClick) {
+    if (isClick === void 0) isClick = false;
     hideTooltip();
+
+    if (!element) return;
 
     var tooltip = document.createElement('div');
     tooltip.className = 'layout_tooltip_wrap';
@@ -101,6 +102,7 @@
       if (spaceRight < tooltipRect.width) left2 = ev.pageX - tooltipRect.width - 10;
       tooltip.style.left = left2 + 'px';
       tooltip.style.top = top2 + 'px';
+      tooltip.style.maxWidth = '';
     }
 
     element.addEventListener('mousemove', onMove);
@@ -108,6 +110,8 @@
   }
 
   function isValidInput(input, showErrors) {
+    if (showErrors === void 0) showErrors = false;
+
     var isValid = true;
     var errorMessage = '';
 
@@ -115,12 +119,11 @@
     var isRequired = !!input.required || input.getAttribute('aria-required') === 'true';
     var isEmpty = value === '';
 
-    // not required -> empty ok
     if (!isRequired && isEmpty) {
       input.style.borderColor = '';
       input.removeAttribute('aria-invalid');
-      var err = input.nextElementSibling;
-      if (err && err.classList && err.classList.contains('error-message')) err.remove();
+      var err0 = input.nextElementSibling;
+      if (err0 && err0.classList && err0.classList.contains('error-message')) err0.remove();
       return true;
     }
 
@@ -149,7 +152,6 @@
       isValid = value !== '' && value !== 'Select Category';
       errorMessage = 'Please select a category.';
     } else {
-      // text/textarea
       isValid = value !== '';
       errorMessage = 'This field is required.';
     }
@@ -170,74 +172,102 @@
       input.style.borderColor = '';
       input.removeAttribute('aria-invalid');
       var errorElement2 = input.nextElementSibling;
-      if (errorElement2 && errorElement2.classList && errorElement2.classList.contains('error-message')) {
-        errorElement2.remove();
-      }
+      if (errorElement2 && errorElement2.classList && errorElement2.classList.contains('error-message')) errorElement2.remove();
     }
 
     return isValid;
   }
 
-  function validateStep(stepEl, showErrors) {
-    var ok = true;
+  function validateStep(stepElement, showErrors) {
+    if (showErrors === void 0) showErrors = false;
+    var isValid = true;
 
-    // standard fields
-    // In Webflow, inputs may not consistently carry a shared class across steps.
-    // Validate all relevant fields in the current step.
-    var inputs = stepEl.querySelectorAll('input, textarea, select');
+    var inputs = stepElement.querySelectorAll('input.form_main_field_input, textarea.form_main_field_input, select.form_main_field_input');
+    if (!inputs.length) inputs = stepElement.querySelectorAll('input, textarea, select');
+
     inputs.forEach(function (input) {
       if (input.dataset.dirty === 'true' || input.dataset.dirty === undefined) {
-        if (!isValidInput(input, !!showErrors)) ok = false;
+        if (!isValidInput(input, showErrors)) isValid = false;
       }
     });
 
-    // radios (Webflow uses w--redirected-checked)
-    var radioButtons = stepEl.querySelectorAll('.form_main_option_link');
+    // radios
+    var radioButtons = stepElement.querySelectorAll('.form_main_option_link');
     if (radioButtons.length) {
-      var checked = stepEl.querySelector('.form_main_option_link.w--redirected-checked');
-      if (!checked) ok = false;
+      var checked = stepElement.querySelector('.form_main_option_link.w--redirected-checked');
+      if (!checked) isValid = false;
     }
 
-    // range slider handles must be moved
-    var rangeSliders = stepEl.querySelectorAll('.form_rangeslider-2_wrapper');
-    rangeSliders.forEach(function (range) {
-      var handles = range.querySelectorAll('[fs-rangeslider-element="handle"], [fs-rangeslider-element="handle-2"], [fs-rangeslider-element="handle-3"], [fs-rangeslider-element="handle-3-right"]');
+    // range sliders
+    var rangeSliders = stepElement.querySelectorAll('.form_rangeslider-2_wrapper');
+    rangeSliders.forEach(function (rangeSlider) {
+      var handles = rangeSlider.querySelectorAll('[fs-rangeslider-element="handle"], [fs-rangeslider-element="handle-2"], [fs-rangeslider-element="handle-3"], [fs-rangeslider-element="handle-3-right"]');
       var moved = false;
       handles.forEach(function (h) { if (h.dataset.moved === 'true') moved = true; });
-      if (!moved) ok = false;
+      if (!moved) {
+        isValid = false;
+        if (showErrors) handles.forEach(function (h) { h.style.borderColor = 'var(--z_color--sys-error-red)'; });
+      } else {
+        handles.forEach(function (h) { h.style.borderColor = ''; });
+      }
     });
 
-    return ok;
+    return isValid;
   }
 
-  function updateNextButtonState(stepEl, nextButton) {
-    if (!nextButton || !stepEl) return;
-    var isValid = validateStep(stepEl, false);
-    nextButton.classList.toggle('is-inactive', !isValid);
-    nextButton.setAttribute('aria-disabled', (!isValid).toString());
+  function updateNextButtonState(stepElement, nextButton) {
+    var ok = validateStep(stepElement, false);
+    if (!nextButton) return;
+    if (ok) {
+      nextButton.classList.remove('is-inactive');
+      nextButton.style.cursor = 'pointer';
+      nextButton.setAttribute('aria-disabled', 'false');
+    } else {
+      nextButton.classList.add('is-inactive');
+      nextButton.style.cursor = 'not-allowed';
+      nextButton.setAttribute('aria-disabled', 'true');
+    }
   }
 
   function updateSubmitButtonState(messageField, submitButton) {
-    if (!submitButton || !messageField) return;
+    if (!messageField || !submitButton) return;
     var ok = isValidInput(messageField, false);
-    submitButton.classList.toggle('is-inactive', !ok);
-    submitButton.disabled = !ok;
+    if (ok) {
+      submitButton.classList.remove('is-inactive');
+      submitButton.style.cursor = 'pointer';
+    } else {
+      submitButton.classList.add('is-inactive');
+      submitButton.style.cursor = 'not-allowed';
+    }
+  }
+
+  function getTooltipMessage(stepElement) {
+    var inputs = stepElement.querySelectorAll('input, textarea, select');
+    if (inputs.length) {
+      var first = inputs[0];
+      if (first.type === 'radio' || (first.tagName || '').toLowerCase() === 'select') {
+        return 'Please make a selection.';
+      }
+      if (first.type === 'range' || (first.classList && first.classList.contains('form_rangeslider_input'))) {
+        return 'Please adjust the slider to a valid value.';
+      }
+    }
+    return 'Please fill in the required fields.';
   }
 
   function animateStepTransition(oldStep, newStep, direction) {
+    // Prefer gsap, but allow fallback
     if (!window.gsap) {
-      // fallback: simple show/hide
-      var oldEl = document.querySelector('.form_main_step[data-form-step="' + oldStep + '"]');
-      var newEl = document.querySelector('.form_main_step[data-form-step="' + newStep + '"]');
-      if (oldEl) oldEl.style.display = 'none';
-      if (newEl) newEl.style.display = 'flex';
+      var oldEl0 = document.querySelector('.form_main_step[data-form-step="' + oldStep + '"]');
+      var newEl0 = document.querySelector('.form_main_step[data-form-step="' + newStep + '"]');
+      if (oldEl0) oldEl0.style.display = 'none';
+      if (newEl0) newEl0.style.display = 'flex';
       return;
     }
 
     var oldStepElement = document.querySelector('.form_main_step[data-form-step="' + oldStep + '"]');
     var newStepElement = document.querySelector('.form_main_step[data-form-step="' + newStep + '"]');
     var navigationButtons = document.querySelector('.form_navigation_buttons');
-
     if (!oldStepElement || !newStepElement || !navigationButtons) return;
 
     newStepElement.style.display = 'none';
@@ -299,10 +329,8 @@
 
   WFApp.pages.Contact = {
     init: function ({ container }) {
-      // Guard: if the contact form isn't on the page, no-op.
       var form = qs(container, '#Contact-Form');
       if (!form) {
-        // still rebind global hover/reveal
         if (WFApp.global && typeof WFApp.global.rebind === 'function') WFApp.global.rebind(container);
         return { destroy: function () {} };
       }
@@ -312,6 +340,40 @@
       if (min) {
         qsa(container, 'input[type="date"]').forEach(function (d) { d.setAttribute('min', min); });
       }
+
+      // Datepicker helpers (from bw24)
+      var dateInput = qs(container, '#datepicker');
+      var datepickerWrapper = qs(container, '#datepicker-wrap');
+      function updateDateHasValue() {
+        if (!dateInput) return;
+        if (dateInput.value) dateInput.classList.add('date-input--has-value');
+        else dateInput.classList.remove('date-input--has-value');
+      }
+      if (dateInput) {
+        updateDateHasValue();
+        dateInput.addEventListener('change', updateDateHasValue);
+      }
+      if (datepickerWrapper && dateInput && typeof dateInput.showPicker === 'function') {
+        datepickerWrapper.addEventListener('click', function (event) {
+          if (event.target !== dateInput) {
+            event.preventDefault();
+            try { dateInput.showPicker(); } catch (_) {}
+          }
+        });
+      }
+
+      // Job radio values
+      var jobRadios = qsa(container, 'input[name="Job"]');
+      jobRadios.forEach(function (radio) {
+        var label = radio.closest('label');
+        if (!label) return;
+        var jobTypeEl = qs(label, '[data-job-type]');
+        var jobTitleEl = qs(label, '[data-job-titel]');
+        if (!jobTypeEl || !jobTitleEl) return;
+        var jobType = jobTypeEl.getAttribute('data-job-type');
+        var jobTitle = jobTitleEl.getAttribute('data-job-titel');
+        radio.value = String(jobType || '') + ' - ' + String(jobTitle || '');
+      });
 
       var steps = qsa(container, '.form_main_step');
       var nextButton = qs(container, '.btn_main_wrap.bw-contact.is-next');
@@ -324,29 +386,22 @@
       var listeners = [];
 
       function on(el, ev, fn, opts) {
-        if (!el) return;
+        if (!el || !el.addEventListener) return;
         el.addEventListener(ev, fn, opts);
         listeners.push([el, ev, fn, opts]);
       }
 
       function getURLParameter(name) {
-        var urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get(name);
-      }
-
-      function updateButtons(step) {
-        if (prevButton) prevButton.style.display = (step === 'start') ? 'none' : '';
-        if (nextButton) nextButton.style.display = (step === 'message') ? 'none' : '';
-        if (submitButton) submitButton.style.display = (step === 'message') ? '' : 'none';
-
-        // Ensure the CTA states are recomputed whenever visibility changes.
-        var currentStepEl = form.querySelector('.form_main_step[data-form-step="' + currentStep + '"]');
-        if (currentStepEl) updateNextButtonState(currentStepEl, nextButton);
-        if (messageField && submitButton) updateSubmitButtonState(messageField, submitButton);
+        try {
+          var urlParams = new URLSearchParams(window.location.search);
+          return urlParams.get(name);
+        } catch (_) {
+          return null;
+        }
       }
 
       function requireByName(stepElement, name) {
-        var el = stepElement.querySelector('[name="' + name + '"]');
+        var el = qs(stepElement, '[name="' + name + '"]');
         if (!el) return;
         el.required = true;
         el.setAttribute('aria-required', 'true');
@@ -355,51 +410,59 @@
       function applyConditionalRequired(stepElement) {
         if (!stepElement) return;
 
-        // reset
-        stepElement.querySelectorAll('input, select, textarea').forEach(function (el) {
+        // Reset required flags within the current step.
+        qsa(stepElement, 'input, select, textarea').forEach(function (el) {
           el.required = false;
           el.removeAttribute('aria-required');
         });
 
         var step = stepElement.getAttribute('data-form-step');
 
-        var selection = document.querySelector('input[name="selection"]:checked') ? document.querySelector('input[name="selection"]:checked').value : null;
-        var selection2 = document.querySelector('input[name="selection-2"]:checked') ? document.querySelector('input[name="selection-2"]:checked').value : null;
-        var isPitchPath = form.dataset.pathPitch === 'true' || selection === 'pitch';
-        var isIrPath = selection === 'ir';
-        var isSalesPath = selection2 === 'sales';
+        // Determine active path from selections within this container.
+        var selection = qs(container, 'input[name="selection"]:checked');
+        var selection2 = qs(container, 'input[name="selection-2"]:checked');
+        var isPitchPath = form.dataset.pathPitch === 'true' || (selection && selection.value === 'pitch');
+        var isIrPath = selection && selection.value === 'ir';
+        var isSalesPath = selection2 && selection2.value === 'sales';
 
-        // base
-        if (step === 'start') {
-          requireByName(stepElement, 'First-Name');
-          requireByName(stepElement, 'Last-Name');
-          requireByName(stepElement, 'Email');
-        }
-        if (step === 'message') {
-          requireByName(stepElement, 'message');
-        }
-        if (step === 'event') {
-          requireByName(stepElement, 'Event-Name');
-          requireByName(stepElement, 'eventWebsite');
-          requireByName(stepElement, 'date_field');
-        }
-        if (step === 'ir-2') {
-          requireByName(stepElement, 'Phone-number');
+        // Base requirements
+        switch (step) {
+          case 'start':
+            requireByName(stepElement, 'First-Name');
+            requireByName(stepElement, 'Last-Name');
+            requireByName(stepElement, 'Email');
+            break;
+          case 'message':
+            requireByName(stepElement, 'message');
+            break;
+          case 'event':
+            requireByName(stepElement, 'Event-Name');
+            requireByName(stepElement, 'eventWebsite');
+            requireByName(stepElement, 'date_field');
+            break;
+          case 'ir-2':
+            requireByName(stepElement, 'Phone-number');
+            break;
+          default:
+            break;
         }
 
-        // path-specific example (kept minimal, can be expanded to match bw24 exactly)
+        // Path-specific requirements
         if (step === 'general') {
-          if (isPitchPath || isSalesPath || isIrPath || selection2 === 'career' || selection2 === 'event') {
+          if (isPitchPath || isSalesPath || isIrPath || (selection2 && (selection2.value === 'career' || selection2.value === 'event'))) {
             requireByName(stepElement, 'Company-Name');
           }
+        }
+
+        if (step === 'sales-1') {
+          if (isSalesPath) requireByName(stepElement, 'category');
         }
       }
 
       function initializeStep(stepElement) {
         if (!stepElement) return;
 
-        var fields = stepElement.querySelectorAll('input, select, textarea');
-
+        var fields = qsa(stepElement, 'input, select, textarea');
         fields.forEach(function (field) {
           if (field.dataset.bwValidateBound === 'true') return;
           field.dataset.bwValidateBound = 'true';
@@ -423,28 +486,30 @@
           });
         });
 
-        // radio buttons
+        // Radio buttons
         qsa(stepElement, '.form_main_option_link').forEach(function (rb) {
           if (rb.dataset.bwRadioBound === 'true') return;
           rb.dataset.bwRadioBound = 'true';
           on(rb, 'click', function () {
-            setTimeout(function () { updateNextButtonState(stepElement, nextButton); }, 100);
+            setTimeout(function () {
+              updateNextButtonState(stepElement, nextButton);
+            }, 100);
           });
         });
 
-        // range sliders
-        qsa(stepElement, '.form_rangeslider-2_wrapper').forEach(function (range) {
-          var handles = range.querySelectorAll('[fs-rangeslider-element="handle"], [fs-rangeslider-element="handle-2"], [fs-rangeslider-element="handle-3"], [fs-rangeslider-element="handle-3-right"]');
-          handles.forEach(function (h) {
-            h.dataset.moved = 'false';
-            if (h.dataset.bwHandleBound === 'true') return;
-            h.dataset.bwHandleBound = 'true';
-            on(h, 'mousedown', function () { h.dataset.moved = 'true'; });
-            on(h, 'touchstart', function () { h.dataset.moved = 'true'; });
-            on(h, 'mouseup', function () { h.dataset.moved = 'true'; updateNextButtonState(stepElement, nextButton); });
-            on(h, 'touchend', function () { h.dataset.moved = 'true'; updateNextButtonState(stepElement, nextButton); });
+        // Range sliders
+        qsa(stepElement, '.form_rangeslider-2_wrapper').forEach(function (rangeSlider) {
+          var handles = rangeSlider.querySelectorAll('[fs-rangeslider-element="handle"], [fs-rangeslider-element="handle-2"], [fs-rangeslider-element="handle-3"], [fs-rangeslider-element="handle-3-right"]');
+          handles.forEach(function (handle) {
+            handle.dataset.moved = 'false';
+            if (handle.dataset.bwHandleBound === 'true') return;
+            handle.dataset.bwHandleBound = 'true';
+            on(handle, 'mousedown', function () { handle.dataset.moved = 'true'; });
+            on(handle, 'touchstart', function () { handle.dataset.moved = 'true'; });
+            on(handle, 'mouseup', function () { handle.dataset.moved = 'true'; updateNextButtonState(stepElement, nextButton); });
+            on(handle, 'touchend', function () { handle.dataset.moved = 'true'; updateNextButtonState(stepElement, nextButton); });
           });
-          on(range, 'input', function () { updateNextButtonState(stepElement, nextButton); });
+          on(rangeSlider, 'input', function () { updateNextButtonState(stepElement, nextButton); });
         });
 
         updateNextButtonState(stepElement, nextButton);
@@ -472,24 +537,75 @@
         updateSubmitButtonState(messageField, submitButton);
       }
 
+      function updateButtons(step) {
+        if (prevButton) prevButton.style.display = (stepHistory.length > 1) ? 'inline-block' : 'none';
+        if (nextButton) nextButton.style.display = (step === 'message') ? 'none' : 'inline-block';
+        if (submitButton) submitButton.style.display = (step === 'message') ? 'inline-block' : 'none';
+      }
+
+      function getNextStep(step) {
+        var currentStepElement = qs(form, '.form_main_step[data-form-step="' + step + '"]');
+        if (!currentStepElement) return null;
+
+        var nextStep;
+        var isPitchPath = form.dataset.pathPitch === 'true';
+
+        if (isPitchPath && step === 'start') {
+          nextStep = 'general';
+        } else if (isPitchPath && step === 'general') {
+          nextStep = 'pitch-1';
+        } else if (step === 'start') {
+          nextStep = 'select-1';
+        } else if (step === 'general') {
+          var previousStep = stepHistory[stepHistory.length - 1];
+          if (previousStep === 'select-1') {
+            var selected1 = qs(container, 'input[name="selection"]:checked');
+            if (selected1) {
+              if (selected1.value === 'pitch') nextStep = 'pitch-1';
+              else if (selected1.value === 'ir') nextStep = 'ir-1';
+            }
+          } else if (previousStep === 'ir-1') {
+            var irSel = qs(container, 'input[name="IR-Selection"]:checked');
+            if (irSel && irSel.value === 'corporate') nextStep = 'ir-1a';
+          } else if (previousStep === 'select-2') {
+            var selected2 = qs(container, 'input[name="selection-2"]:checked');
+            if (selected2) {
+              if (selected2.value === 'sales') nextStep = 'sales-1';
+              else if (selected2.value === 'pr') nextStep = 'message';
+            }
+          }
+        } else {
+          var selectedRadio = qs(currentStepElement, 'input[type="radio"]:checked');
+          if (selectedRadio) {
+            nextStep = selectedRadio.getAttribute('data-form-path');
+            if (nextStep === 'sales' || nextStep === 'pr') nextStep = 'general';
+            else if (nextStep === 'corporate') nextStep = 'general';
+          } else {
+            nextStep = currentStepElement.getAttribute('data-form-target');
+          }
+        }
+
+        return nextStep;
+      }
+
+      function getPreviousStep() {
+        if (stepHistory.length > 1) return stepHistory.pop();
+        return null;
+      }
+
       function showStep(step) {
         var oldStep = currentStep;
         var direction = stepHistory.indexOf(step) !== -1 ? 'prev' : 'next';
 
-        if (direction === 'next') stepHistory.push(oldStep);
-        else stepHistory.pop();
-
         currentStep = step;
 
         steps.forEach(function (stepElement) {
-          if (stepElement.getAttribute('data-form-step') === step) {
-            initializeStep(stepElement);
-          }
+          if (stepElement.getAttribute('data-form-step') === step) initializeStep(stepElement);
         });
 
         updateButtons(step);
 
-        var currentStepEl = form.querySelector('.form_main_step[data-form-step="' + currentStep + '"]');
+        var currentStepEl = qs(form, '.form_main_step[data-form-step="' + currentStep + '"]');
         applyConditionalRequired(currentStepEl);
         updateNextButtonState(currentStepEl, nextButton);
 
@@ -502,6 +618,27 @@
         }
       }
 
+      function goToNextStep() {
+        var currentStepElement = qs(form, '.form_main_step[data-form-step="' + currentStep + '"]');
+        if (!currentStepElement) return;
+
+        if (validateStep(currentStepElement, true)) {
+          var nextStep = getNextStep(currentStep);
+          if (nextStep) {
+            stepHistory.push(currentStep);
+            showStep(nextStep);
+          }
+        } else {
+          var msg = getTooltipMessage(currentStepElement);
+          showTooltip(nextButton, msg, true);
+        }
+      }
+
+      function goToPreviousStep() {
+        var prev = getPreviousStep();
+        if (prev) showStep(prev);
+      }
+
       // Prevent Enter submit mid-flow
       on(form, 'keydown', function (event) {
         if (event.keyCode === 13) {
@@ -512,34 +649,59 @@
       });
 
       // Buttons
-      on(nextButton, 'click', function (e) {
-        e.preventDefault();
-        var currentStepEl = form.querySelector('.form_main_step[data-form-step="' + currentStep + '"]');
-        if (!currentStepEl) return;
-
-        if (!validateStep(currentStepEl, true)) {
-          showTooltip(nextButton, 'Please fill in the required fields.', true);
-          return;
-        }
-
-        // find next step in DOM order
-        var idx = steps.findIndex(function (s) { return s.getAttribute('data-form-step') === currentStep; });
-        if (idx >= 0 && idx < steps.length - 1) {
-          var next = steps[idx + 1].getAttribute('data-form-step');
-          showStep(next);
-        }
-      });
-
       on(prevButton, 'click', function (e) {
         e.preventDefault();
-        if (!stepHistory.length) return;
-        var prev = stepHistory[stepHistory.length - 1];
-        showStep(prev);
+        goToPreviousStep();
       });
 
+      on(nextButton, 'click', function (e) {
+        e.preventDefault();
+
+        if (nextButton && !nextButton.classList.contains('is-inactive')) {
+          goToNextStep();
+        } else {
+          var currentStepElement = qs(form, '.form_main_step[data-form-step="' + currentStep + '"]');
+          if (!currentStepElement) return;
+          var msg = getTooltipMessage(currentStepElement);
+          validateStep(currentStepElement, true);
+          if (window.innerWidth <= 768) showTooltip(nextButton, msg, true);
+          else showTooltip(nextButton, msg);
+        }
+      });
+
+      on(nextButton, 'mouseenter', function () {
+        if (nextButton && nextButton.classList.contains('is-inactive')) {
+          var currentStepElement = qs(form, '.form_main_step[data-form-step="' + currentStep + '"]');
+          if (!currentStepElement) return;
+          var msg = getTooltipMessage(currentStepElement);
+          showTooltip(nextButton, msg);
+        }
+      });
+
+      on(nextButton, 'mouseleave', hideTooltip);
+
+      on(submitButton, 'click', function (event) {
+        var currentStepElement = qs(form, '.form_main_step[data-form-step="' + currentStep + '"]');
+        if (!currentStepElement) return;
+        if (!validateStep(currentStepElement, true)) {
+          event.preventDefault();
+          if (window.innerWidth <= 768) showTooltip(submitButton, 'Please fill in the required fields.', true);
+          else showTooltip(submitButton, 'Please fill in the required fields.');
+        }
+      });
+
+      on(submitButton, 'mouseenter', function () {
+        if (submitButton && submitButton.classList.contains('is-inactive')) {
+          showTooltip(submitButton, 'Please fill in the required fields.');
+        }
+      });
+
+      on(submitButton, 'mouseleave', hideTooltip);
+
       // Initialize
+      showStep(currentStep);
+
       var pathParam = getURLParameter('path');
-      showStep('start');
       if (pathParam === 'pitch') form.dataset.pathPitch = 'true';
 
       // Ensure global hover/reveal bindings on this page
