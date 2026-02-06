@@ -485,10 +485,15 @@
             await delay(0);
             // Make sure Webflow IX2 is initialized for this DOM before we reveal it.
             reinitWebflowIX2();
+
+            // New hook: DOM swapped + IX2 ready, overlay still up.
+            try { window.dispatchEvent(new CustomEvent('pageTransitionBeforeReveal')); } catch (_) {}
+
             await animateEnter(data.next && data.next.container);
 
             // Ensure controller is mounted before firing compatibility event.
             await mountPromise;
+            // Old hook: after reveal + controller mount.
             try { window.dispatchEvent(new CustomEvent('pageTransitionCompleted')); } catch (_) {}
           },
           async leave(data) {
@@ -529,10 +534,15 @@
             await delay(0);
             // Make sure Webflow IX2 is initialized for this DOM before we reveal it.
             reinitWebflowIX2();
+
+            // New hook: DOM swapped + IX2 ready, overlay still up.
+            try { window.dispatchEvent(new CustomEvent('pageTransitionBeforeReveal')); } catch (_) {}
+
             await animateEnter(data.next && data.next.container);
 
             // Ensure controller is mounted before firing compatibility event.
             await mountPromise;
+            // Old hook: after reveal + controller mount.
             try { window.dispatchEvent(new CustomEvent('pageTransitionCompleted')); } catch (_) {}
           },
           async after(data) {

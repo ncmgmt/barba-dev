@@ -510,7 +510,25 @@
   }
 
   function bwCreateBlocksAll() {
-    if (!window.gsap || !window.ScrollTrigger) return;
+    // If deps are not ready yet (first-load race), retry for a short window.
+    if (!window.gsap || !window.ScrollTrigger) {
+      var state = WFApp._bwBlocksRetry || (WFApp._bwBlocksRetry = { tries: 0, timer: null });
+      if (state.timer) return;
+      state.timer = setInterval(function () {
+        state.tries++;
+        if (window.gsap && window.ScrollTrigger) {
+          clearInterval(state.timer);
+          state.timer = null;
+          bwCreateBlocksAll();
+        }
+        if (state.tries > 30) {
+          clearInterval(state.timer);
+          state.timer = null;
+        }
+      }, 100);
+      return;
+    }
+
     var containers = document.querySelectorAll('[data-background="true"]');
     containers.forEach(function (c) {
       bwEnsureBlocksReady(c);
