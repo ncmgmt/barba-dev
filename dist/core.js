@@ -641,6 +641,17 @@
             // Give the browser a paint to apply final styles before removing overlay.
             try { await waitForPaint(); } catch (_) {}
 
+            // Extra safety: force the *current* Barba container visible right before removing overlay.
+            // (During swaps, references can get stale; query the live container.)
+            try {
+              var live = document.querySelector('[data-barba="container"]');
+              if (live) {
+                live.style.opacity = '1';
+                live.style.visibility = 'visible';
+                if (!live.style.display) live.style.display = 'block';
+              }
+            } catch (_) {}
+
             // Finalize transition: hide overlay + unlock body only AFTER page is ready/visible.
             try { hideTransition(); } catch (_) {}
             try { unlockBody(); } catch (_) {}
@@ -738,6 +749,17 @@
 
             // Give the browser a paint to apply final styles before removing overlay.
             try { await waitForPaint(); } catch (_) {}
+
+            // Extra safety: force the *current* Barba container visible right before removing overlay.
+            // (During swaps, references can get stale; query the live container.)
+            try {
+              var live = document.querySelector('[data-barba="container"]');
+              if (live) {
+                live.style.opacity = '1';
+                live.style.visibility = 'visible';
+                if (!live.style.display) live.style.display = 'block';
+              }
+            } catch (_) {}
 
             // Finalize transition: hide overlay + unlock body only AFTER page is ready/visible.
             try { hideTransition(); } catch (_) {}
