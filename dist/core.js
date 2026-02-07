@@ -275,7 +275,10 @@
       lockBody();
       ensureTransitionVisible();
 
-      if (transitionWrap) window.gsap.set(transitionWrap, { opacity: 1, visibility: 'visible' });
+      // Important: do NOT force opacity:1 here.
+      // Doing so can produce a single-frame flash where the new container becomes fully visible
+      // before the timeline sets it back to opacity:0.
+      if (transitionWrap) window.gsap.set(transitionWrap, { visibility: 'visible' });
       // Custom CSS sets [data-transition-contain='fade'] { opacity: 0 } by default.
       // Keep it visible during and after transitions to avoid a blank/gap.
       try { if (fadeEl) fadeEl.style.opacity = '1'; } catch (_) {}
@@ -476,6 +479,19 @@
     return new Promise(function (r) { setTimeout(r, ms || 0); });
   }
 
+  // Wait for at least two animation frames (double-rAF).
+  // Useful to ensure DOM + Webflow IX2 initial states have been applied and painted
+  // before we start revealing content.
+  function waitForPaint() {
+    return new Promise(function (resolve) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          resolve();
+        });
+      });
+    });
+  }
+
   // ---- Webflow IX reinit (optional) ----
   function reinitWebflowIX2() {
     // Only if Webflow runtime exists
@@ -562,7 +578,7 @@
             tryInitGlobalOnce();
 
             // Create readiness gate for first load.
-            createReadyGate();
+            var gate = createReadyGate();
 
             // On hard reload, Webflow may briefly paint content before IX2 applies initial states.
             // Keep the overlay up and the container hidden until we explicitly reveal.
@@ -586,10 +602,20 @@
             var ns = getNamespace(data, 'next');
             var mountPromise = mountNamespace(ns, data.next.container, data);
 
+            // Auto-signal fallback: if a namespace/controller never signals readiness,
+            // resolve the gate as soon as mounting finishes (prevents waiting for timeout).
+            try {
+              mountPromise.then(function () {
+                try { if (window.WFApp && window.WFApp.ready) window.WFApp.ready.signal(gate && gate.token); } catch (_) {}
+              });
+            } catch (_) {}
+
             // Let the swapped DOM paint before we animate reveal.
-            await delay(0);
+            await waitForPaint();
             // Make sure Webflow IX2 is initialized for this DOM before we reveal it.
             reinitWebflowIX2();
+            // IX2 applies initial states asynchronously; wait for paint.
+            await waitForPaint();
 
             // New hook: DOM swapped + IX2 ready, overlay still up.
             try { window.dispatchEvent(new CustomEvent('pageTransitionBeforeReveal')); } catch (_) {}
@@ -646,7 +672,7 @@
           },
           async beforeEnter(data) {
             // Create a fresh readiness gate for this navigation.
-            createReadyGate();
+            var gate = createReadyGate();
 
             // Keep the incoming container hidden while Webflow IX2 applies initial states.
             // If we reveal too early, IX2 can re-hide/re-animate elements => flicker/double animations.
@@ -666,8 +692,16 @@
             var ns = getNamespace(data, 'next');
             var mountPromise = mountNamespace(ns, data.next.container, data);
 
+            // Auto-signal fallback: if a namespace/controller never signals readiness,
+            // resolve the gate as soon as mounting finishes (prevents waiting for timeout).
+            try {
+              mountPromise.then(function () {
+                try { if (window.WFApp && window.WFApp.ready) window.WFApp.ready.signal(gate && gate.token); } catch (_) {}
+              });
+            } catch (_) {}
+
             // Let the swapped DOM paint before we animate reveal.
-            await delay(0);
+            await waitForPaint();
 
             // New hook: DOM swapped + IX2 ready, overlay still up.
             try { window.dispatchEvent(new CustomEvent('pageTransitionBeforeReveal')); } catch (_) {}

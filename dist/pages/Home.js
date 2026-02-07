@@ -857,12 +857,19 @@
 
       // ---- Start ----
       (async function () {
+        var readyToken = 0;
+        try { readyToken = (window.WFApp && window.WFApp.ready) ? window.WFApp.ready.token : 0; } catch (_) {}
+
         await initHomeAnimations();
         await initSwipers();
-      })();
 
-      // Signal to core that initial states are set and the page is ready to animate.
-      try { if (window.WFApp && window.WFApp.ready && typeof window.WFApp.ready.signal === 'function') window.WFApp.ready.signal(); } catch (_) {}
+        // Signal to core that initial states are set and the page is ready to animate.
+        try {
+          if (window.WFApp && window.WFApp.ready && typeof window.WFApp.ready.signal === 'function') {
+            window.WFApp.ready.signal(readyToken);
+          }
+        } catch (_) {}
+      })();
 
       return {
         destroy: function () {
