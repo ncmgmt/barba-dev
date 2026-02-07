@@ -21,6 +21,8 @@
     // Readiness gate: keep the transition overlay up until the new page signals it is ready.
     // Prevents gaps when scripts/CMS load late.
     readyTimeoutMs: 4000,
+    // Optional extra hold after ready (helps align overlay reveal with page animations)
+    revealDelayMs: 500,
 
     // jsDelivr base for page controllers.
     // If you prefer: set this from Webflow before loading core.js:
@@ -599,6 +601,8 @@
               await Promise.race([p, delay(CONFIG.readyTimeoutMs)]);
             } catch (_) {}
 
+            try { if (CONFIG.revealDelayMs) await delay(CONFIG.revealDelayMs); } catch (_) {}
+
             await animateEnter(data.next && data.next.container);
 
             // Ensure controller is mounted before firing post-reveal hook.
@@ -674,6 +678,9 @@
               var p = gate && gate.promise ? gate.promise : Promise.resolve(true);
               await Promise.race([p, delay(CONFIG.readyTimeoutMs)]);
             } catch (_) {}
+
+            // Optional extra hold (fine-tune perceived alignment)
+            try { if (CONFIG.revealDelayMs) await delay(CONFIG.revealDelayMs); } catch (_) {}
 
             // Start reveal animation (overlay out + container fade).
             await animateEnter(data.next && data.next.container);

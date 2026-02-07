@@ -742,17 +742,16 @@
       try { if (splitRightEls && splitRightEls.length && window.gsap) window.gsap.set(splitRightEls, { opacity: 0, yPercent: 20 }); } catch (_) {}
 
       function openMenu(open) {
-        // Allow toggles even while active: stop current tween and play desired direction.
-        try { tl.pause(); } catch (_) {}
+        // Match bw24 behavior: ignore open/close requests while the timeline is active.
+        // This prevents immediate close due to menuBase mouseenter firing during the open animation.
+        try { if (tl.isActive && tl.isActive()) return; } catch (_) {}
 
         if (open) {
           isOpen = true;
           menuEl.classList.add('nav-open');
           try { wrap.style.pointerEvents = 'auto'; } catch (_) {}
 
-          // Do NOT show the menu wrapper before the timeline starts.
-          // Otherwise elements like the CTA can flash visible for a frame.
-          // Let tl.set(menuWrapEl, {display:'flex'}) at t=0 control visibility.
+          // Ensure CTAs start hidden; they'll animate in at '<0.45'
           try {
             if (splitRightEls && splitRightEls.length && window.gsap) window.gsap.set(splitRightEls, { opacity: 0, yPercent: 20 });
           } catch (_) {}
