@@ -157,36 +157,12 @@
 
   function ensureTransitionVisible() {
     var wrap = qs(CONFIG.transitionWrapSelector);
-    if (!wrap) return;
-    wrap.style.display = 'flex';
-
-    // Ensure the overlay actually hides the outgoing page.
-    // Some Webflow layouts leave the transition wrap background transparent.
-    // If columns don't fully cover for a frame, users can see the old page bleeding through.
-    try {
-      if (!wrap.dataset.bgSaved) {
-        wrap.dataset.bgSaved = '1';
-        wrap.dataset.bgPrev = wrap.style.backgroundColor || '';
-      }
-      // If no inline bg is set, provide a safe fallback while transitioning.
-      if (!wrap.style.backgroundColor) wrap.style.backgroundColor = '#000';
-    } catch (_) {}
+    if (wrap) wrap.style.display = 'flex';
   }
 
   function hideTransition() {
     var wrap = qs(CONFIG.transitionWrapSelector);
-    if (!wrap) return;
-
-    // Restore background override (see ensureTransitionVisible)
-    try {
-      if (wrap.dataset && wrap.dataset.bgSaved) {
-        wrap.style.backgroundColor = wrap.dataset.bgPrev || '';
-        delete wrap.dataset.bgSaved;
-        delete wrap.dataset.bgPrev;
-      }
-    } catch (_) {}
-
-    wrap.style.display = 'none';
+    if (wrap) wrap.style.display = 'none';
   }
 
   function logoAnimationOnce() {
@@ -285,12 +261,14 @@
     try { window.dispatchEvent(new CustomEvent('pageTransitionRevealStart')); } catch (_) {}
     // Transition out: columns move up, next container fades in
     return new Promise(function (resolve) {
-      var transitionWrap = nextContainer || qs(CONFIG.contentWrapSelector);
+      // Always target the incoming Barba container. Falling back to a global selector
+      // can accidentally pick the outgoing page and makes the transition feel "decoupled".
+      var transitionWrap = nextContainer;
       var pageTransition = qs(CONFIG.transitionWrapSelector);
       var cols = qsa(CONFIG.transitionColumnSelector);
       var fadeEl = qs(CONFIG.fadeContainSelector);
 
-      if (!window.gsap || !pageTransition || !cols.length) {
+      if (!window.gsap || !pageTransition || !cols.length || !transitionWrap) {
         hideTransition();
         unlockBody();
         return resolve();
