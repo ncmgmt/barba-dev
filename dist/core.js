@@ -654,16 +654,20 @@
               }
             } catch (_) {}
 
+            // Make sure the transition overlay is visible as early as possible.
+            // If we hide the current container before the overlay is painted, users can see a brief blank gap.
+            try {
+              ensureTransitionVisible();
+              var wrap = qs(CONFIG.transitionWrapSelector);
+              if (wrap) {
+                wrap.style.opacity = '1';
+                wrap.style.visibility = 'visible';
+              }
+            } catch (_) {}
+
             // Kill only ScrollTriggers that belong to the outgoing container.
             try { killScrollTriggersIn(data && data.current && data.current.container); } catch (_) {}
             unmountNamespace(getNamespace(data, 'current'));
-
-            // Hide current container immediately so we never show the old page after the leave animation.
-            try {
-              if (data && data.current && data.current.container) {
-                data.current.container.style.opacity = '0';
-              }
-            } catch (_) {}
 
             // Play leave animation BEFORE we swap content
             await animateLeave();
