@@ -641,6 +641,9 @@
               }
             } catch (_) {}
 
+            // Give the browser a paint to apply final styles before removing overlay.
+            try { await waitForPaint(); } catch (_) {}
+
             // Finalize transition: hide overlay + unlock body only AFTER page is ready/visible.
             try { hideTransition(); } catch (_) {}
             try { unlockBody(); } catch (_) {}
@@ -739,6 +742,9 @@
                 data.next.container.style.visibility = 'visible';
               }
             } catch (_) {}
+
+            // Give the browser a paint to apply final styles before removing overlay.
+            try { await waitForPaint(); } catch (_) {}
 
             // Finalize transition: hide overlay + unlock body only AFTER page is ready/visible.
             try { hideTransition(); } catch (_) {}
