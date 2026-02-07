@@ -615,8 +615,13 @@
       flip(false);
 
       var tl = window.gsap.timeline({ paused: true });
-      // Webflow menu wrap is a flex container; keep correct layout when revealing
-      tl.set(menuWrapEl, { display: 'flex' });
+      // Webflow menu wrap is a flex container; keep correct layout when revealing.
+      // Important: do NOT use tl.set(..., {display}) here because GSAP can apply 0-duration
+      // tweens immediately even on paused timelines (immediateRender), which would make the
+      // menu visible before clicking. Use a callback at t=0 instead.
+      tl.add(function () {
+        try { menuWrapEl.style.display = 'flex'; } catch (_) {}
+      }, 0);
       tl.from(menuBaseEl, {
         duration: 0.4,
         opacity: 0,
@@ -641,9 +646,15 @@
       if (navLineEls[1]) tl.to(navLineEls[1], { duration: 0.5, opacity: 0, ease: 'none' }, '<');
       if (navLineEls[2]) tl.to(navLineEls[2], { duration: 0.5, rotate: -45, ease: 'none' }, '<');
       if (splitRightEl) {
-        // Prevent early visibility: keep CTA hidden from the start of the timeline,
-        // then animate it in at the bw24 timing point.
-        tl.set(splitRightEl, { opacity: 0, yPercent: 20 }, 0);
+        // Prevent early visibility: set CTA initial state via a t=0 callback
+        // (avoids immediateRender issues on paused timelines).
+        tl.add(function () {
+          try {
+            if (window.gsap) window.gsap.set(splitRightEl, { opacity: 0, yPercent: 20 });
+            else { splitRightEl.style.opacity = '0'; }
+          } catch (_) {}
+        }, 0);
+
         // Match bw24 timing: start 0.45s after the segment that begins at '<'
         // (bw24 used delay:0.45 while positioned at '<').
         tl.to(splitRightEl, { duration: 0.4, opacity: 1, yPercent: 0, ease: 'power2.out' }, '<0.45');
