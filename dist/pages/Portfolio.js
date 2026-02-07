@@ -760,9 +760,10 @@
         });
       }
 
-      // bw24 contract: start portfolio reveal under the overlay (mid-enter)
-      function onMidEnter() {
-        window.removeEventListener('pageTransitionCompleted', onMidEnter);
+      // Start portfolio reveal AFTER the page is revealed (otherwise it finishes under the overlay).
+      // We still wait for CMS items to exist before starting.
+      function onAfterReveal() {
+        window.removeEventListener('pageTransitionAfterReveal', onAfterReveal);
         waitForItems().then(function () {
           WFApp._fsPortfolio.allowInit = true;
           // initializePortfolioItems drives the reveal + decode + interactions and is also used by cmsload render events
@@ -772,7 +773,14 @@
           }, 50);
         });
       }
-      window.addEventListener('pageTransitionCompleted', onMidEnter, { once: true });
+      window.addEventListener('pageTransitionAfterReveal', onAfterReveal, { once: true });
+
+      // Fallback (hard reload / edge cases): if the event doesn't fire, run shortly after.
+      setTimeout(function () {
+        try {
+          if (!WFApp._fsPortfolio.allowInit) onAfterReveal();
+        } catch (_) {}
+      }, 1200);
 
       return {
         destroy: function () {
