@@ -144,15 +144,29 @@
   }
 
   function lockBody() {
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.width = '100%';
+    // IMPORTANT: Avoid position:fixed locking.
+    // In this Webflow setup it can cause a brief blank/gap on unlock when the browser reflows.
+    // We only disable scrolling via overflow.
+    try {
+      WFApp._lockState = WFApp._lockState || {
+        htmlOverflow: document.documentElement.style.overflow,
+        bodyOverflow: document.body.style.overflow
+      };
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+    } catch (_) {}
   }
 
   function unlockBody() {
-    document.body.style.overflow = '';
-    document.body.style.position = '';
-    document.body.style.width = '';
+    try {
+      var s = WFApp._lockState || {};
+      document.documentElement.style.overflow = s.htmlOverflow || '';
+      document.body.style.overflow = s.bodyOverflow || '';
+      WFApp._lockState = null;
+    } catch (_) {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+    }
   }
 
   function ensureTransitionVisible() {
