@@ -666,6 +666,7 @@
 
       // Ensure a clean initial state (hidden until opened)
       try { menuWrapEl.style.display = 'none'; } catch (_) {}
+      try { if (splitRightEl && window.gsap) window.gsap.set(splitRightEl, { opacity: 0, yPercent: 20 }); } catch (_) {}
 
       function openMenu(open) {
         // Allow toggles even while active: stop current tween and play desired direction.
@@ -675,7 +676,14 @@
           isOpen = true;
           menuEl.classList.add('nav-open');
           try { wrap.style.pointerEvents = 'auto'; } catch (_) {}
-          try { menuWrapEl.style.display = 'block'; } catch (_) {}
+
+          // Do NOT show the menu wrapper before the timeline starts.
+          // Otherwise elements like the CTA can flash visible for a frame.
+          // Let tl.set(menuWrapEl, {display:'flex'}) at t=0 control visibility.
+          try {
+            if (splitRightEl && window.gsap) window.gsap.set(splitRightEl, { opacity: 0, yPercent: 20 });
+          } catch (_) {}
+
           tl.play(0);
         } else {
           isOpen = false;
