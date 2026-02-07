@@ -144,29 +144,14 @@
   }
 
   function lockBody() {
-    // IMPORTANT: Avoid position:fixed locking.
-    // In this Webflow setup it can cause a brief blank/gap on unlock when the browser reflows.
-    // We only disable scrolling via overflow.
-    try {
-      WFApp._lockState = WFApp._lockState || {
-        htmlOverflow: document.documentElement.style.overflow,
-        bodyOverflow: document.body.style.overflow
-      };
-      document.documentElement.style.overflow = 'hidden';
-      document.body.style.overflow = 'hidden';
-    } catch (_) {}
+    // Disabled: scroll locking via overflow changes causes reflow/blank gaps in this Webflow setup.
+    // The transition overlay already blocks interaction (pointer-events:none on overlay + columns cover).
+    return;
   }
 
   function unlockBody() {
-    try {
-      var s = WFApp._lockState || {};
-      document.documentElement.style.overflow = s.htmlOverflow || '';
-      document.body.style.overflow = s.bodyOverflow || '';
-      WFApp._lockState = null;
-    } catch (_) {
-      document.documentElement.style.overflow = '';
-      document.body.style.overflow = '';
-    }
+    // Disabled (see lockBody)
+    return;
   }
 
   function ensureTransitionVisible() {
