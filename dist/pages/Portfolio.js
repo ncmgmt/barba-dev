@@ -670,6 +670,10 @@
       }
     }
 
+    // Expose helpers so the controller can coordinate with the transition contract
+    WFApp._fsPortfolio.resetItems = resetPortfolioItems;
+    WFApp._fsPortfolio.initItems = initializePortfolioItems;
+
     window.fsAttributes.push([
       'cmsload',
       function (listInstances) {
@@ -762,8 +766,10 @@
         waitForItems().then(function () {
           WFApp._fsPortfolio.allowInit = true;
           // initializePortfolioItems drives the reveal + decode + interactions and is also used by cmsload render events
-          resetPortfolioItems(container);
-          setTimeout(function () { initializePortfolioItems(); }, 50);
+          try { if (WFApp._fsPortfolio && WFApp._fsPortfolio.resetItems) WFApp._fsPortfolio.resetItems(container); } catch (_) {}
+          setTimeout(function () {
+            try { if (WFApp._fsPortfolio && WFApp._fsPortfolio.initItems) WFApp._fsPortfolio.initItems(); } catch (_) {}
+          }, 50);
         });
       }
       window.addEventListener('pageTransitionCompleted', onMidEnter, { once: true });
