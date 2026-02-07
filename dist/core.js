@@ -746,9 +746,8 @@
             } catch (_) {}
 
             // IMPORTANT: scroll reset must happen while the overlay covers the page.
-            // Wait one paint so the overlay is actually visible before jumping to top.
-            try { await waitForPaint(); } catch (_) {}
-            try { window.scrollTo(0, 0); } catch (_) {}
+            // Doing it too early (before columns cover) causes a visible jump.
+            // We do it later, after animateLeave() has fully covered the screen.
 
             // Freeze layout to avoid a brief 0-height wrapper/container during DOM swap.
             try { freezeWrapperHeight(data && data.current && data.current.container); } catch (_) {}
@@ -759,6 +758,9 @@
 
             // Play leave animation BEFORE we swap content
             await animateLeave();
+
+            // Now the columns cover the viewport: safe to jump to top without being visible.
+            try { window.scrollTo(0, 0); } catch (_) {}
 
             // Now that the overlay fully covers the screen, hide the outgoing container.
             // This prevents the old page from bleeding through during the reveal of the next page.
