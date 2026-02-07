@@ -774,8 +774,12 @@
             try { await waitForPaint(); } catch (_) {}
 
             // Finalize transition.
+            // IMPORTANT: unlocking scroll (changing overflow styles) can cause a brief reflow/blank gap.
+            // So we hide the overlay first, let the browser paint the new page, then unlock.
             try { hideTransition(); } catch (_) {}
-            try { unlockBody(); } catch (_) {}
+            try { await waitForPaint(); } catch (_) {}
+            try { await waitForPaint(); } catch (_) {}
+            try { setTimeout(function () { try { unlockBody(); } catch (_) {} }, 150); } catch (_) { try { unlockBody(); } catch (_) {} }
 
             try { window.scrollTo(0, 0); } catch (_) {}
 
