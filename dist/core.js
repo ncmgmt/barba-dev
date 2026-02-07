@@ -52,6 +52,8 @@
   // Controllers can call WFApp.ready.signal() when their DOM is in initial state and ready to animate.
   WFApp.ready = WFApp.ready || {};
   WFApp.ready._state = WFApp.ready._state || { token: 0, resolved: false, resolve: null, promise: null };
+  // Expose current token for controllers to capture (avoid late signals resolving the wrong navigation).
+  WFApp.ready.token = WFApp.ready._state.token || 0;
 
   function createReadyGate() {
     var s = WFApp.ready._state;
@@ -59,13 +61,16 @@
     s.resolved = false;
     s.resolve = null;
     s.promise = new Promise(function (res) { s.resolve = res; });
+    WFApp.ready.token = s.token;
     return { token: s.token, promise: s.promise };
   }
 
-  WFApp.ready.signal = function signalReady() {
+  // signal(token?): if token is provided, only resolves if it matches the current gate.
+  WFApp.ready.signal = function signalReady(token) {
     try {
       var s = WFApp.ready._state;
       if (!s || s.resolved) return;
+      if (typeof token === 'number' && isFinite(token) && token !== s.token) return;
       s.resolved = true;
       if (typeof s.resolve === 'function') s.resolve(true);
     } catch (_) {}

@@ -742,13 +742,16 @@
       // Gate Finsweet/cmsload-driven animations to the transition contract.
       WFApp._fsPortfolio.allowInit = false;
 
+      // Capture the current navigation token so late CMS resolves don't unblock a newer navigation.
+      var readyToken = (window.WFApp && window.WFApp.ready) ? window.WFApp.ready.token : undefined;
+
       // Signal ready once CMS items exist (so we don't reveal to a blank list).
       waitForItems().then(function () {
-        try { if (window.WFApp && window.WFApp.ready && typeof window.WFApp.ready.signal === 'function') window.WFApp.ready.signal(); } catch (_) {}
+        try { if (window.WFApp && window.WFApp.ready && typeof window.WFApp.ready.signal === 'function') window.WFApp.ready.signal(readyToken); } catch (_) {}
       });
       // Safety: never block reveal forever
       setTimeout(function () {
-        try { if (window.WFApp && window.WFApp.ready && typeof window.WFApp.ready.signal === 'function') window.WFApp.ready.signal(); } catch (_) {}
+        try { if (window.WFApp && window.WFApp.ready && typeof window.WFApp.ready.signal === 'function') window.WFApp.ready.signal(readyToken); } catch (_) {}
       }, 2500);
 
       function waitForItems() {
