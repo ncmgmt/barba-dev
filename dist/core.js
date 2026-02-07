@@ -193,12 +193,30 @@
 
   function ensureTransitionVisible() {
     var wrap = qs(CONFIG.transitionWrapSelector);
-    if (wrap) wrap.style.display = 'flex';
+    if (!wrap) return;
+    // Keep in DOM and visible immediately.
+    wrap.style.display = 'flex';
+    // Avoid flicker from display toggles by using opacity.
+    wrap.style.transition = 'opacity 120ms linear';
+    wrap.style.opacity = '1';
   }
 
   function hideTransition() {
     var wrap = qs(CONFIG.transitionWrapSelector);
-    if (wrap) wrap.style.display = 'none';
+    if (!wrap) return;
+
+    // Fade out instead of immediate display:none to avoid a 1-frame blank gap
+    // during layout/paint after Barba swaps.
+    try {
+      wrap.style.transition = 'opacity 120ms linear';
+      wrap.style.opacity = '0';
+    } catch (_) {}
+
+    // Remove from layout shortly after fade.
+    setTimeout(function () {
+      try { wrap.style.display = 'none'; } catch (_) {}
+      try { wrap.style.opacity = '1'; } catch (_) {}
+    }, 140);
   }
 
   function logoAnimationOnce() {
