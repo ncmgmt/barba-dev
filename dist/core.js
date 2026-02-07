@@ -491,6 +491,28 @@
     });
   }
 
+  // Wait until an element is actually visible (painted + has size) or timeout.
+  function waitForVisible(el, timeoutMs) {
+    if (timeoutMs === void 0) timeoutMs = 300;
+    return new Promise(function (resolve) {
+      var start = Date.now();
+      (function tick() {
+        try {
+          if (!el) return resolve(false);
+          var cs = getComputedStyle(el);
+          var op = parseFloat(cs.opacity);
+          var disp = cs.display;
+          var vis = cs.visibility;
+          var r = el.getBoundingClientRect();
+          var ok = !(disp === 'none' || vis === 'hidden' || (isFinite(op) && op <= 0.01) || r.height < 2 || r.width < 2);
+          if (ok) return resolve(true);
+        } catch (_) {}
+        if (Date.now() - start > timeoutMs) return resolve(false);
+        requestAnimationFrame(tick);
+      })();
+    });
+  }
+
   // ---- Webflow IX reinit (optional) ----
   function reinitWebflowIX2() {
     // Only if Webflow runtime exists
@@ -643,8 +665,9 @@
 
             // Extra safety: force the *current* Barba container visible right before removing overlay.
             // (During swaps, references can get stale; query the live container.)
+            var live = null;
             try {
-              var live = document.querySelector('[data-barba="container"]');
+              live = document.querySelector('[data-barba="container"]');
               if (live) {
                 live.style.opacity = '1';
                 live.style.visibility = 'visible';
@@ -652,8 +675,12 @@
               }
             } catch (_) {}
 
+            // Wait a couple frames for layout/IX2/CMS to settle so we don't reveal a 0-height container.
+            try { await waitForVisible(live, 450); } catch (_) {}
+
             // Finalize transition: hide overlay + unlock body only AFTER page is ready/visible.
             try { hideTransition(); } catch (_) {}
+            try { await waitForPaint(); } catch (_) {}
             try { unlockBody(); } catch (_) {}
           },
           async leave(data) {
@@ -752,8 +779,9 @@
 
             // Extra safety: force the *current* Barba container visible right before removing overlay.
             // (During swaps, references can get stale; query the live container.)
+            var live = null;
             try {
-              var live = document.querySelector('[data-barba="container"]');
+              live = document.querySelector('[data-barba="container"]');
               if (live) {
                 live.style.opacity = '1';
                 live.style.visibility = 'visible';
@@ -761,8 +789,12 @@
               }
             } catch (_) {}
 
+            // Wait a couple frames for layout/IX2/CMS to settle so we don't reveal a 0-height container.
+            try { await waitForVisible(live, 450); } catch (_) {}
+
             // Finalize transition: hide overlay + unlock body only AFTER page is ready/visible.
             try { hideTransition(); } catch (_) {}
+            try { await waitForPaint(); } catch (_) {}
             try { unlockBody(); } catch (_) {}
           },
           async after(data) {
