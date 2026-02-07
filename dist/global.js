@@ -561,6 +561,66 @@
   // can be dropped and the menu stays open across pages.
   //
   // ---- Menu (ported from bw24/gsap_menu.js; Barba-safe, no jQuery) ----
+
+  // Copyright Year Auto-Update (bw24 parity)
+  try {
+    var y = String((new Date()).getFullYear());
+    Array.prototype.slice.call(document.querySelectorAll('[data-current="year"]')).forEach(function (el) {
+      try { el.textContent = y; } catch (_) {}
+    });
+  } catch (_) {}
+
+  // Nav ScrollTriggers from bw24/gsap_menu.js
+  function initNavScrollTriggersOnce() {
+    if (WFApp._navScrollTriggersInited) return;
+    WFApp._navScrollTriggersInited = true;
+    if (!window.gsap || !window.ScrollTrigger) return;
+
+    // Hide nav when footer becomes visible
+    try {
+      window.gsap.to('.layout_nav_wrap', {
+        y: '-100%',
+        opacity: 0,
+        ease: 'sine.inOut',
+        scrollTrigger: {
+          trigger: '.content_wrap',
+          start: 'bottom 85%',
+          end: 'bottom 50%',
+          scrub: false,
+          toggleActions: 'play none none reverse'
+        }
+      });
+    } catch (_) {}
+
+    // Backdrop blur on certain pages
+    try {
+      var pageAttribute = document.body && document.body.getAttribute ? document.body.getAttribute('data-page') : null;
+      if (
+        pageAttribute === 'portfolio' ||
+        pageAttribute === 'insights' ||
+        pageAttribute === 'contact' ||
+        pageAttribute === 'jobs' ||
+        pageAttribute === 'team' ||
+        pageAttribute === 'utility' ||
+        pageAttribute === 'legal'
+      ) {
+        window.gsap.to('.layout_nav_wrap', {
+          css: {
+            backdropFilter: 'blur(3px)',
+            webkitBackdropFilter: 'blur(3px)'
+          },
+          ease: 'sine.inOut',
+          scrollTrigger: {
+            trigger: '.page_wrap',
+            start: 'top top-=10',
+            end: 'top 97%',
+            toggleActions: 'play none none reverse',
+            scrub: true
+          }
+        });
+      }
+    } catch (_) {}
+  }
   // This implementation replaces the external gsap_menu.js so we can control the menu
   // from Barba transitions without desyncing the button state.
   WFApp.menu = WFApp.menu || {};
@@ -885,6 +945,8 @@
 
     // menu: init the built-in menu controller (replaces external gsap_menu.js)
     try { if (typeof menuInitOnce === 'function') menuInitOnce(); } catch (_) {}
+    // nav: init bw24 parity scroll triggers
+    try { initNavScrollTriggersOnce(); } catch (_) {}
 
     // menu: close on internal link clicks inside the menu (capture-phase)
     installMenuLinkCloseOnce();
@@ -899,6 +961,20 @@
     // Re-bind behaviors inside the newly swapped container when possible
     var root = (data && data.next && data.next.container) ? data.next.container : document;
     initDecodeUI(root);
+
+    // nav scroll triggers depend on body[data-page] and page markup; rebuild after swap
+    try {
+      if (window.ScrollTrigger && typeof window.ScrollTrigger.getAll === 'function') {
+        window.ScrollTrigger.getAll().forEach(function (t) {
+          try {
+            var trig = t && t.vars ? t.vars.trigger : null;
+            if (trig === '.content_wrap' || trig === '.page_wrap') t.kill();
+          } catch (_) {}
+        });
+      }
+    } catch (_) {}
+    try { WFApp._navScrollTriggersInited = false; } catch (_) {}
+    try { initNavScrollTriggersOnce(); } catch (_) {}
 
     // blocks background might live inside the swapped container
     bwCreateBlocksAll();
