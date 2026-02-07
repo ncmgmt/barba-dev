@@ -586,7 +586,9 @@
       var menuLinkEls = Array.prototype.slice.call(wrap.querySelectorAll('.nav_link'));
       var menuImgEl = wrap.querySelector('.nav_visual_wrap');
       var splitLeftEls = Array.prototype.slice.call(wrap.querySelectorAll('.nav_split_left'));
-      var splitRightEl = wrap.querySelector('.nav_cta_contain');
+      // There are two CTA variants in the menu (desktop + mobile).
+      // Animate both like bw24's jQuery selection would.
+      var splitRightEls = Array.prototype.slice.call((menuWrapEl || wrap).querySelectorAll('.nav_cta_contain'));
       var navIconEls = Array.prototype.slice.call(wrap.querySelectorAll('.nav_icon_social'));
       var mobileCtaEl = wrap.querySelector('.nav_mobile_cta');
 
@@ -645,19 +647,19 @@
       if (navLineEls[0]) tl.to(navLineEls[0], { duration: 0.5, rotate: 45, ease: 'none' }, '<');
       if (navLineEls[1]) tl.to(navLineEls[1], { duration: 0.5, opacity: 0, ease: 'none' }, '<');
       if (navLineEls[2]) tl.to(navLineEls[2], { duration: 0.5, rotate: -45, ease: 'none' }, '<');
-      if (splitRightEl) {
+      if (splitRightEls && splitRightEls.length) {
         // Prevent early visibility: set CTA initial state via a t=0 callback
         // (avoids immediateRender issues on paused timelines).
         tl.add(function () {
           try {
-            if (window.gsap) window.gsap.set(splitRightEl, { opacity: 0, yPercent: 20 });
-            else { splitRightEl.style.opacity = '0'; }
+            if (window.gsap) window.gsap.set(splitRightEls, { opacity: 0, yPercent: 20 });
+            else splitRightEls.forEach(function (el) { try { el.style.opacity = '0'; } catch (_) {} });
           } catch (_) {}
         }, 0);
 
         // Match bw24 timing: start 0.45s after the segment that begins at '<'
         // (bw24 used delay:0.45 while positioned at '<').
-        tl.to(splitRightEl, { duration: 0.4, opacity: 1, yPercent: 0, ease: 'power2.out' }, '<0.45');
+        tl.to(splitRightEls, { duration: 0.4, opacity: 1, yPercent: 0, ease: 'power2.out' }, '<0.45');
       }
       if (mobileCtaEl) tl.from(mobileCtaEl, { duration: 0.5, borderTopColor: 'transparent', borderBottomColor: 'transparent', ease: 'power2.inOut' }, '<');
       if (navIconEls.length) tl.from(navIconEls, { duration: 0.15, opacity: 0, ease: 'none', yPercent: 20 });
@@ -671,13 +673,13 @@
         try { menuWrapEl.style.display = 'none'; } catch (_) {}
         // Clear CTA inline styles so subsequent opens start clean.
         try {
-          if (splitRightEl && window.gsap) window.gsap.set(splitRightEl, { clearProps: 'all' });
+          if (splitRightEls && splitRightEls.length && window.gsap) window.gsap.set(splitRightEls, { clearProps: 'all' });
         } catch (_) {}
       });
 
       // Ensure a clean initial state (hidden until opened)
       try { menuWrapEl.style.display = 'none'; } catch (_) {}
-      try { if (splitRightEl && window.gsap) window.gsap.set(splitRightEl, { opacity: 0, yPercent: 20 }); } catch (_) {}
+      try { if (splitRightEls && splitRightEls.length && window.gsap) window.gsap.set(splitRightEls, { opacity: 0, yPercent: 20 }); } catch (_) {}
 
       function openMenu(open) {
         // Allow toggles even while active: stop current tween and play desired direction.
@@ -692,7 +694,7 @@
           // Otherwise elements like the CTA can flash visible for a frame.
           // Let tl.set(menuWrapEl, {display:'flex'}) at t=0 control visibility.
           try {
-            if (splitRightEl && window.gsap) window.gsap.set(splitRightEl, { opacity: 0, yPercent: 20 });
+            if (splitRightEls && splitRightEls.length && window.gsap) window.gsap.set(splitRightEls, { opacity: 0, yPercent: 20 });
           } catch (_) {}
 
           tl.play(0);
