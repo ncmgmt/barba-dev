@@ -745,6 +745,10 @@
               }
             } catch (_) {}
 
+            // IMPORTANT: scroll reset must happen while the overlay covers the page.
+            // Doing it in `after` causes a visible jump/gap (especially when navigating from footer).
+            try { window.scrollTo(0, 0); } catch (_) {}
+
             // Freeze layout to avoid a brief 0-height wrapper/container during DOM swap.
             try { freezeWrapperHeight(data && data.current && data.current.container); } catch (_) {}
 
@@ -844,8 +848,6 @@
             try { await waitForPaint(); } catch (_) {}
             try { await waitForPaint(); } catch (_) {}
             try { setTimeout(function () { try { unlockBody(); } catch (_) {} }, 150); } catch (_) { try { unlockBody(); } catch (_) {} }
-
-            try { window.scrollTo(0, 0); } catch (_) {}
 
             if (window.ScrollTrigger && typeof window.ScrollTrigger.refresh === 'function') {
               try { window.ScrollTrigger.refresh(); } catch (_) {}
