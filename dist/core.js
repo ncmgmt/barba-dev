@@ -746,7 +746,8 @@
             } catch (_) {}
 
             // IMPORTANT: scroll reset must happen while the overlay covers the page.
-            // Doing it in `after` causes a visible jump/gap (especially when navigating from footer).
+            // Wait one paint so the overlay is actually visible before jumping to top.
+            try { await waitForPaint(); } catch (_) {}
             try { window.scrollTo(0, 0); } catch (_) {}
 
             // Freeze layout to avoid a brief 0-height wrapper/container during DOM swap.
