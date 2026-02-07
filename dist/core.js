@@ -641,10 +641,9 @@
               }
             } catch (_) {}
 
-            // Finalize transition only after final visibility is applied.
-            try { await waitForPaint(); } catch (_) {}
-            try { hideTransition(); } catch (_) {}
-            try { unlockBody(); } catch (_) {}
+            // Do NOT hide the overlay here.
+            // We'll finalize (hide overlay + unlock body) in the global `after` hook,
+            // because the live container can still be style-hidden until Barba completes the swap.
           },
           async leave(data) {
             // Close menu overlays before navigating (prevents visual flash + wrong layering)
@@ -741,12 +740,29 @@
               }
             } catch (_) {}
 
-            // Finalize transition only after final visibility is applied.
-            try { await waitForPaint(); } catch (_) {}
-            try { hideTransition(); } catch (_) {}
-            try { unlockBody(); } catch (_) {}
+            // Do NOT hide the overlay here.
+            // We'll finalize (hide overlay + unlock body) in the global `after` hook,
+            // because the live container can still be style-hidden until Barba completes the swap.
           },
           async after(data) {
+            // At this point Barba has completed the swap; the live container is stable.
+            // Ensure it is visible (some pages/IX2 can leave inline hidden styles briefly).
+            try {
+              var live = document.querySelector('[data-barba="container"]');
+              if (live) {
+                live.style.opacity = '1';
+                live.style.visibility = 'visible';
+                if (!live.style.display) live.style.display = 'block';
+              }
+            } catch (_) {}
+
+            // Let the browser paint the new page before removing the overlay.
+            try { await waitForPaint(); } catch (_) {}
+
+            // Finalize transition.
+            try { hideTransition(); } catch (_) {}
+            try { unlockBody(); } catch (_) {}
+
             try { window.scrollTo(0, 0); } catch (_) {}
 
             if (window.ScrollTrigger && typeof window.ScrollTrigger.refresh === 'function') {
