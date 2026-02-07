@@ -143,6 +143,34 @@
     return Array.prototype.slice.call((root || document).querySelectorAll(sel));
   }
 
+  // ---- Layout freeze helpers ----
+  // Some navigations briefly produce a 0-height/unstable container during DOM swap,
+  // which can show up as a tiny "gap" even if opacity/visibility is correct.
+  // We freeze the wrapper height during transitions to keep layout stable.
+  function freezeWrapperHeight(currentContainer) {
+    try {
+      var wrapper = document.querySelector('[data-barba="wrapper"]');
+      if (!wrapper || !currentContainer) return;
+      var r = currentContainer.getBoundingClientRect();
+      if (!r || !isFinite(r.height) || r.height < 10) return;
+      if (!WFApp._freezeState) WFApp._freezeState = {};
+      if (WFApp._freezeState.active) return;
+      WFApp._freezeState.active = true;
+      WFApp._freezeState.prevMinHeight = wrapper.style.minHeight || '';
+      wrapper.style.minHeight = Math.ceil(r.height) + 'px';
+    } catch (_) {}
+  }
+
+  function unfreezeWrapperHeight() {
+    try {
+      var wrapper = document.querySelector('[data-barba="wrapper"]');
+      if (!wrapper) return;
+      var s = WFApp._freezeState || {};
+      wrapper.style.minHeight = s.prevMinHeight || '';
+      WFApp._freezeState = null;
+    } catch (_) {}
+  }
+
   // ---- Scroll lock (no layout reflow) ----
   // We must prevent scroll during transitions, but toggling overflow/position on <html>/<body>
   // caused brief reflow/blank gaps in this Webflow setup.
@@ -715,6 +743,9 @@
               }
             } catch (_) {}
 
+            // Freeze layout to avoid a brief 0-height wrapper/container during DOM swap.
+            try { freezeWrapperHeight(data && data.current && data.current.container); } catch (_) {}
+
             // Kill only ScrollTriggers that belong to the outgoing container.
             try { killScrollTriggersIn(data && data.current && data.current.container); } catch (_) {}
             unmountNamespace(getNamespace(data, 'current'));
@@ -819,6 +850,9 @@
             }
 
             tryGlobalAfterEnter(data);
+
+            // Unfreeze layout after the swap is complete.
+            try { unfreezeWrapperHeight(); } catch (_) {}
           }
         }
       ]
