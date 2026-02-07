@@ -358,10 +358,9 @@
       lockBody();
       ensureTransitionVisible();
 
-      // Important: do NOT force opacity:1 here.
-      // Doing so can produce a single-frame flash where the new container becomes fully visible
-      // before the timeline sets it back to opacity:0.
-      if (transitionWrap) window.gsap.set(transitionWrap, { visibility: 'visible' });
+      // Prepare incoming container for fade-in UNDER the overlay.
+      // We explicitly set opacity:0 first to avoid any flash.
+      if (transitionWrap) window.gsap.set(transitionWrap, { opacity: 0, visibility: 'visible' });
       // Custom CSS sets [data-transition-contain='fade'] { opacity: 0 } by default.
       // Keep it visible during and after transitions to avoid a blank/gap.
       try { if (fadeEl) fadeEl.style.opacity = '1'; } catch (_) {}
@@ -417,17 +416,20 @@
         setTimeout(function () { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 1500);
       }, null, 0.5);
 
-      // Fade the new container in quickly so we never see an empty background behind the columns.
-      tl.fromTo(transitionWrap || {},
+      // Fade the new container in UNDER the overlay, so by the time columns clear,
+      // content is already visible (prevents perceived "gap").
+      tl.fromTo(transitionWrap,
         { opacity: 0 },
         {
           opacity: 1,
-          duration: 0.35,
-          ease: 'power2.out',
+          duration: 0.2,
+          ease: 'linear',
+          immediateRender: false,
           onStart: function () {
             if (fadeEl) fadeEl.style.opacity = '1';
           }
-        }
+        },
+        0.1
       )
         .to(cols, {
           y: '-100vh',
