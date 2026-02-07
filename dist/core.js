@@ -18,6 +18,10 @@
   var CONFIG = {
     debug: true,
 
+    // Readiness gate: keep the transition overlay up until the new page signals it is ready.
+    // Prevents gaps when scripts/CMS load late.
+    readyTimeoutMs: 4000,
+
     // jsDelivr base for page controllers.
     // If you prefer: set this from Webflow before loading core.js:
     // window.WFAPP_CDN_BASE = 'https://cdn.jsdelivr.net/gh/ncmgmt/barba-dev@main/dist/pages';
@@ -43,6 +47,29 @@
   WFApp.pages = WFApp.pages || {}; // controllers register here
   WFApp._instances = WFApp._instances || {}; // namespace -> instance
   WFApp._loadedScripts = WFApp._loadedScripts || new Set();
+
+  // ---- Page readiness gate ----
+  // Controllers can call WFApp.ready.signal() when their DOM is in initial state and ready to animate.
+  WFApp.ready = WFApp.ready || {};
+  WFApp.ready._state = WFApp.ready._state || { token: 0, resolved: false, resolve: null, promise: null };
+
+  function createReadyGate() {
+    var s = WFApp.ready._state;
+    s.token++;
+    s.resolved = false;
+    s.resolve = null;
+    s.promise = new Promise(function (res) { s.resolve = res; });
+    return { token: s.token, promise: s.promise };
+  }
+
+  WFApp.ready.signal = function signalReady() {
+    try {
+      var s = WFApp.ready._state;
+      if (!s || s.resolved) return;
+      s.resolved = true;
+      if (typeof s.resolve === 'function') s.resolve(true);
+    } catch (_) {}
+  };
 
   WFApp.loadCssOnce = function loadCssOnce(href) {
     if (!href) return Promise.resolve();
@@ -223,6 +250,8 @@
   function animateEnter(nextContainer) {
     // reset per-enter mid hook guard
     WFApp._enterMidFired = false;
+    // Signal: reveal is starting now (overlay begins moving out)
+    try { window.dispatchEvent(new CustomEvent('pageTransitionRevealStart')); } catch (_) {}
     // Transition out: columns move up, next container fades in
     return new Promise(function (resolve) {
       var transitionWrap = nextContainer || qs(CONFIG.contentWrapSelector);
@@ -525,6 +554,9 @@
           async once(data) {
             tryInitGlobalOnce();
 
+            // Create readiness gate for first load.
+            createReadyGate();
+
             // On hard reload, Webflow may briefly paint content before IX2 applies initial states.
             // Keep the overlay up and the container hidden until we explicitly reveal.
             try {
@@ -554,6 +586,13 @@
 
             // New hook: DOM swapped + IX2 ready, overlay still up.
             try { window.dispatchEvent(new CustomEvent('pageTransitionBeforeReveal')); } catch (_) {}
+
+            // Wait until the page signals readiness (or timeout).
+            try {
+              var gate = WFApp.ready && WFApp.ready._state ? WFApp.ready._state : null;
+              var p = gate && gate.promise ? gate.promise : Promise.resolve(true);
+              await Promise.race([p, delay(CONFIG.readyTimeoutMs)]);
+            } catch (_) {}
 
             await animateEnter(data.next && data.next.container);
 
@@ -597,6 +636,9 @@
             if (CONFIG.transitionOffset) await delay(CONFIG.transitionOffset);
           },
           async beforeEnter(data) {
+            // Create a fresh readiness gate for this navigation.
+            createReadyGate();
+
             // Keep the incoming container hidden while Webflow IX2 applies initial states.
             // If we reveal too early, IX2 can re-hide/re-animate elements => flicker/double animations.
             try {
@@ -621,6 +663,14 @@
             // New hook: DOM swapped + IX2 ready, overlay still up.
             try { window.dispatchEvent(new CustomEvent('pageTransitionBeforeReveal')); } catch (_) {}
 
+            // Wait until the page signals readiness (or timeout).
+            try {
+              var gate = WFApp.ready && WFApp.ready._state ? WFApp.ready._state : null;
+              var p = gate && gate.promise ? gate.promise : Promise.resolve(true);
+              await Promise.race([p, delay(CONFIG.readyTimeoutMs)]);
+            } catch (_) {}
+
+            // Start reveal animation (overlay out + container fade).
             await animateEnter(data.next && data.next.container);
 
             // Ensure controller is mounted before firing post-reveal hook.

@@ -861,6 +861,9 @@
         await initSwipers();
       })();
 
+      // Signal to core that initial states are set and the page is ready to animate.
+      try { if (window.WFApp && window.WFApp.ready && typeof window.WFApp.ready.signal === 'function') window.WFApp.ready.signal(); } catch (_) {}
+
       return {
         destroy: function () {
           listeners.forEach(function (x) {

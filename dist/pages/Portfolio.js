@@ -742,6 +742,15 @@
       // Gate Finsweet/cmsload-driven animations to the transition contract.
       WFApp._fsPortfolio.allowInit = false;
 
+      // Signal ready once CMS items exist (so we don't reveal to a blank list).
+      waitForItems().then(function () {
+        try { if (window.WFApp && window.WFApp.ready && typeof window.WFApp.ready.signal === 'function') window.WFApp.ready.signal(); } catch (_) {}
+      });
+      // Safety: never block reveal forever
+      setTimeout(function () {
+        try { if (window.WFApp && window.WFApp.ready && typeof window.WFApp.ready.signal === 'function') window.WFApp.ready.signal(); } catch (_) {}
+      }, 2500);
+
       function waitForItems() {
         return new Promise(function (resolve) {
           try {
