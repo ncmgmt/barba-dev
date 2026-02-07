@@ -362,6 +362,10 @@
         });
       }
 
+      // Capture readiness token at init-time to avoid late signals resolving a newer navigation.
+      var readyToken = 0;
+      try { readyToken = (WFApp && WFApp.ready) ? WFApp.ready.token : 0; } catch (_) {}
+
       // Job radio values
       var jobRadios = qsa(container, 'input[name="Job"]');
       jobRadios.forEach(function (radio) {
@@ -719,8 +723,9 @@
 
       // Signal to core that initial states are set and the page is ready to animate.
       try {
-        var readyToken = (window.WFApp && window.WFApp.ready) ? window.WFApp.ready.token : 0;
-        if (window.WFApp && window.WFApp.ready && typeof window.WFApp.ready.signal === 'function') window.WFApp.ready.signal(readyToken);
+        if (window.WFApp && window.WFApp.ready && typeof window.WFApp.ready.signal === 'function') {
+          window.WFApp.ready.signal(readyToken);
+        }
       } catch (_) {}
 
       return {

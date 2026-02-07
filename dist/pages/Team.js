@@ -13,6 +13,10 @@
       var listeners = [];
       var st = [];
 
+      // Capture readiness token at init-time to avoid late signals resolving a newer navigation.
+      var readyToken = 0;
+      try { readyToken = (WFApp && WFApp.ready) ? WFApp.ready.token : 0; } catch (_) {}
+
       var splitTypeUmd = 'https://cdn.jsdelivr.net/npm/split-type@0.3.4/umd/index.min.js';
 
       function on(el, ev, fn, opts) {
@@ -395,7 +399,6 @@
 
       // Signal to core that initial states are set and the page is ready to animate.
       try {
-        var readyToken = (window.WFApp && window.WFApp.ready) ? window.WFApp.ready.token : 0;
         if (window.WFApp && window.WFApp.ready && typeof window.WFApp.ready.signal === 'function') window.WFApp.ready.signal(readyToken);
       } catch (_) {}
 
