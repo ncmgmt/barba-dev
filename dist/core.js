@@ -634,14 +634,11 @@
             var gate = createReadyGate();
 
             // On hard reload, Webflow may briefly paint content before IX2 applies initial states.
-            // Keep the overlay up and the container hidden until we explicitly reveal.
+            // Keep the overlay up (it covers the swap). Avoid hiding the container with inline styles
+            // because it can remain hidden after the overlay is removed on internal navigations.
             try {
               ensureTransitionVisible();
               lockBody();
-              if (data && data.next && data.next.container) {
-                data.next.container.style.opacity = '0';
-                data.next.container.style.visibility = 'hidden';
-              }
             } catch (_) {}
 
             // Ensure correct first-load state
@@ -740,14 +737,8 @@
             // Create a fresh readiness gate for this navigation.
             var gate = createReadyGate();
 
-            // Keep the incoming container hidden while Webflow IX2 applies initial states.
-            // If we reveal too early, IX2 can re-hide/re-animate elements => flicker/double animations.
-            try {
-              if (data && data.next && data.next.container) {
-                data.next.container.style.opacity = '0';
-                data.next.container.style.visibility = 'hidden';
-              }
-            } catch (_) {}
+            // Do not hide the incoming container here.
+            // The overlay covers the swap; hiding here can create a visible gap if something delays unhide.
 
             // Re-init Webflow interactions BEFORE revealing the new container.
             // This can take a few hundred ms; we keep the transition overlay up during this time.
