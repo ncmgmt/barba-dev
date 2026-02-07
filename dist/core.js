@@ -269,8 +269,7 @@
       var fadeEl = qs(CONFIG.fadeContainSelector);
 
       if (!window.gsap || !pageTransition || !cols.length || !transitionWrap) {
-        hideTransition();
-        unlockBody();
+        // Nothing to animate; caller finalizes overlay/unlock.
         return resolve();
       }
 
@@ -310,8 +309,7 @@
               } catch (_) {}
 
               if (ok || Date.now() - start > 800) {
-                hideTransition();
-                unlockBody();
+                // Keep overlay visible until the caller finalizes the transition.
                 resolve();
                 return;
               }
@@ -319,8 +317,7 @@
             })();
             return;
           } catch (_) {
-            hideTransition();
-            unlockBody();
+            // Keep overlay visible until the caller finalizes the transition.
             resolve();
           }
         }
@@ -643,6 +640,11 @@
                 data.next.container.style.visibility = 'visible';
               }
             } catch (_) {}
+
+            // Finalize transition only after final visibility is applied.
+            try { await waitForPaint(); } catch (_) {}
+            try { hideTransition(); } catch (_) {}
+            try { unlockBody(); } catch (_) {}
           },
           async leave(data) {
             // Close menu overlays before navigating (prevents visual flash + wrong layering)
@@ -738,6 +740,11 @@
                 data.next.container.style.visibility = 'visible';
               }
             } catch (_) {}
+
+            // Finalize transition only after final visibility is applied.
+            try { await waitForPaint(); } catch (_) {}
+            try { hideTransition(); } catch (_) {}
+            try { unlockBody(); } catch (_) {}
           },
           async after(data) {
             try { window.scrollTo(0, 0); } catch (_) {}
