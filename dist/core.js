@@ -672,6 +672,15 @@
             // Play leave animation BEFORE we swap content
             await animateLeave();
 
+            // Now that the overlay fully covers the screen, hide the outgoing container.
+            // This prevents the old page from bleeding through during the reveal of the next page.
+            try {
+              if (data && data.current && data.current.container) {
+                data.current.container.style.opacity = '0';
+                data.current.container.style.visibility = 'hidden';
+              }
+            } catch (_) {}
+
             if (CONFIG.transitionOffset) await delay(CONFIG.transitionOffset);
           },
           async beforeEnter(data) {
