@@ -751,6 +751,10 @@
           menuEl.classList.add('nav-open');
           try { wrap.style.pointerEvents = 'auto'; } catch (_) {}
 
+          // Force the menu wrapper visible immediately. Some environments can drop the t=0 callback;
+          // this avoids the "nav-open true but menu not visible" state.
+          try { menuWrapEl.style.display = 'flex'; } catch (_) {}
+
           // Ensure CTAs start hidden; they'll animate in at '<0.45'
           try {
             if (splitRightEls && splitRightEls.length && window.gsap) window.gsap.set(splitRightEls, { opacity: 0, yPercent: 20 });
