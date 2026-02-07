@@ -626,13 +626,9 @@
             var ns = getNamespace(data, 'next');
             var mountPromise = mountNamespace(ns, data.next.container, data);
 
-            // Auto-signal fallback: if a namespace/controller never signals readiness,
-            // resolve the gate as soon as mounting finishes (prevents waiting for timeout).
-            try {
-              mountPromise.then(function () {
-                try { if (window.WFApp && window.WFApp.ready) window.WFApp.ready.signal(gate && gate.token); } catch (_) {}
-              });
-            } catch (_) {}
+            // NOTE: no auto-signal fallback here.
+            // Each page controller must explicitly call WFApp.ready.signal(token)
+            // when it is actually ready to be revealed.
 
             // Let the swapped DOM paint before we animate reveal.
             await waitForPaint();
@@ -729,13 +725,9 @@
             var ns = getNamespace(data, 'next');
             var mountPromise = mountNamespace(ns, data.next.container, data);
 
-            // Auto-signal fallback: if a namespace/controller never signals readiness,
-            // resolve the gate as soon as mounting finishes (prevents waiting for timeout).
-            try {
-              mountPromise.then(function () {
-                try { if (window.WFApp && window.WFApp.ready) window.WFApp.ready.signal(gate && gate.token); } catch (_) {}
-              });
-            } catch (_) {}
+            // NOTE: no auto-signal fallback here.
+            // Each page controller must explicitly call WFApp.ready.signal(token)
+            // when it is actually ready to be revealed.
 
             // Let the swapped DOM paint before we animate reveal.
             await waitForPaint();
