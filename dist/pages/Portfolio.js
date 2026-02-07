@@ -787,12 +787,13 @@
       }
       window.addEventListener('pageTransitionAfterReveal', onAfterReveal, { once: true });
 
-      // Fallback (hard reload / edge cases): if the event doesn't fire, run shortly after.
+      // Fallback (hard reload / edge cases): if the event doesn't fire, run later.
+      // IMPORTANT: keep this >= transition duration, otherwise portfolio reveal can finish under the overlay.
       setTimeout(function () {
         try {
           if (!WFApp._fsPortfolio.allowInit) onAfterReveal();
         } catch (_) {}
-      }, 1200);
+      }, 3500);
 
       return {
         destroy: function () {
