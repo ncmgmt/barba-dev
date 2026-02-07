@@ -143,15 +143,52 @@
     return Array.prototype.slice.call((root || document).querySelectorAll(sel));
   }
 
+  // ---- Scroll lock (no layout reflow) ----
+  // We must prevent scroll during transitions, but toggling overflow/position on <html>/<body>
+  // caused brief reflow/blank gaps in this Webflow setup.
+  // So we lock scrolling by canceling wheel/touch/keyboard scroll inputs.
+
   function lockBody() {
-    // Disabled: scroll locking via overflow changes causes reflow/blank gaps in this Webflow setup.
-    // The transition overlay already blocks interaction (pointer-events:none on overlay + columns cover).
-    return;
+    try {
+      if (WFApp._scrollLocked) return;
+      WFApp._scrollLocked = true;
+
+      var prevent = function (e) {
+        try { e.preventDefault(); } catch (_) {}
+        return false;
+      };
+
+      var onKey = function (e) {
+        try {
+          var k = e.key;
+          // Block keys that scroll the page
+          if (k === ' ' || k === 'Spacebar' || k === 'PageDown' || k === 'PageUp' || k === 'Home' || k === 'End' ||
+              k === 'ArrowDown' || k === 'ArrowUp' || k === 'ArrowLeft' || k === 'ArrowRight') {
+            e.preventDefault();
+            return false;
+          }
+        } catch (_) {}
+      };
+
+      WFApp._scrollLockHandlers = { prevent: prevent, onKey: onKey };
+
+      // Use capture + passive:false so preventDefault works reliably.
+      document.addEventListener('wheel', prevent, { passive: false, capture: true });
+      document.addEventListener('touchmove', prevent, { passive: false, capture: true });
+      document.addEventListener('keydown', onKey, { passive: false, capture: true });
+    } catch (_) {}
   }
 
   function unlockBody() {
-    // Disabled (see lockBody)
-    return;
+    try {
+      if (!WFApp._scrollLocked) return;
+      WFApp._scrollLocked = false;
+      var h = WFApp._scrollLockHandlers || {};
+      document.removeEventListener('wheel', h.prevent, true);
+      document.removeEventListener('touchmove', h.prevent, true);
+      document.removeEventListener('keydown', h.onKey, true);
+      WFApp._scrollLockHandlers = null;
+    } catch (_) {}
   }
 
   function ensureTransitionVisible() {
