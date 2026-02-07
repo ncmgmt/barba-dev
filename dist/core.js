@@ -221,6 +221,8 @@
   }
 
   function animateEnter(nextContainer) {
+    // reset per-enter mid hook guard
+    WFApp._enterMidFired = false;
     // Transition out: columns move up, next container fades in
     return new Promise(function (resolve) {
       var transitionWrap = nextContainer || qs(CONFIG.contentWrapSelector);
@@ -282,6 +284,18 @@
           }
         }
       });
+
+      // bw24 contract: fire pageTransitionCompleted mid-enter (under the overlay)
+      // so page controllers can start setting/animating before the overlay is removed.
+      if (!WFApp._enterMidFired) WFApp._enterMidFired = false;
+      tl.call(function () {
+        if (WFApp._enterMidFired) return;
+        WFApp._enterMidFired = true;
+        try { window.dispatchEvent(new CustomEvent('pageTransitionCompleted')); } catch (_) {}
+        try { window.dispatchEvent(new CustomEvent('pageTransitionMidEnter')); } catch (_) {}
+        // bw24 also forces a resize after enter to stabilize layout/ScrollTrigger.
+        setTimeout(function () { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 1500);
+      }, null, 0.5);
 
       // Fade the new container in quickly so we never see an empty background behind the columns.
       tl.fromTo(transitionWrap || {},
@@ -543,10 +557,10 @@
 
             await animateEnter(data.next && data.next.container);
 
-            // Ensure controller is mounted before firing compatibility event.
+            // Ensure controller is mounted before firing post-reveal hook.
             await mountPromise;
-            // Old hook: after reveal + controller mount.
-            try { window.dispatchEvent(new CustomEvent('pageTransitionCompleted')); } catch (_) {}
+            // Post-reveal hook (new). pageTransitionCompleted fires mid-enter like bw24.
+            try { window.dispatchEvent(new CustomEvent('pageTransitionAfterReveal')); } catch (_) {}
 
             // Ensure final visibility
             try {
@@ -609,10 +623,10 @@
 
             await animateEnter(data.next && data.next.container);
 
-            // Ensure controller is mounted before firing compatibility event.
+            // Ensure controller is mounted before firing post-reveal hook.
             await mountPromise;
-            // Old hook: after reveal + controller mount.
-            try { window.dispatchEvent(new CustomEvent('pageTransitionCompleted')); } catch (_) {}
+            // Post-reveal hook (new). pageTransitionCompleted fires mid-enter like bw24.
+            try { window.dispatchEvent(new CustomEvent('pageTransitionAfterReveal')); } catch (_) {}
 
             // Ensure final visibility (beforeEnter set it hidden to avoid IX2 flicker)
             try {

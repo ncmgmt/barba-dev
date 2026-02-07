@@ -652,6 +652,8 @@
     function initializePortfolioItems() {
       var root = WFApp._fsPortfolio.currentContainer;
       if (!root) return;
+      // Gate initial reveal to the transition contract to avoid double animations.
+      if (!WFApp._fsPortfolio.allowInit) return;
 
       var items = root.querySelectorAll('.portfolio_cms_item');
       items.forEach(function (item) {
@@ -733,71 +735,38 @@
         } catch (_) {}
       }, 0);
 
-      function runPortfolioReveal() {
-        // Prevent double-run on first load / hard reload / cmsload edge cases
-        if (container && container.dataset && container.dataset.portfolioRevealDone === 'true') return;
-        if (container && container.dataset) container.dataset.portfolioRevealDone = 'true';
+      // Gate Finsweet/cmsload-driven animations to the transition contract.
+      WFApp._fsPortfolio.allowInit = false;
 
-        var items = container.querySelectorAll('.portfolio_cms_item');
-        items.forEach(function (item) {
-          item.style.visibility = 'visible';
-          item.classList.remove('cms-item-hidden');
-          item.classList.remove('cms-item-initial');
-          if (window.PortfolioDecode) window.PortfolioDecode.addHoverAndClickEffect(item);
+      function waitForItems() {
+        return new Promise(function (resolve) {
+          try {
+            if (container.querySelectorAll('.portfolio_cms_item').length > 0) return resolve();
+          } catch (_) {}
+          var obs = new MutationObserver(function () {
+            try {
+              if (container.querySelectorAll('.portfolio_cms_item').length > 0) {
+                obs.disconnect();
+                resolve();
+              }
+            } catch (_) {}
+          });
+          try { obs.observe(container, { childList: true, subtree: true }); } catch (_) { resolve(); }
+          setTimeout(function () { try { obs.disconnect(); } catch (_) {}; resolve(); }, 4000);
         });
-
-        // replay collection reveal/decode animation even without cmsload events
-        try {
-          if (window.gsap && window.PortfolioDecode) {
-            var delayIncrement = 0.075;
-            items.forEach(function (item, index) {
-              var decLineWrapper = item.querySelector('.layout_line_wrap');
-              var lineBg = item.querySelector('.item_line_base');
-              var lineFill = item.querySelector('.item_line_inner');
-              if (!decLineWrapper || !lineBg || !lineFill) return;
-
-              var decodeDate = item.querySelectorAll('.cms_item_text.is-date');
-              var decodeText = item.querySelectorAll('.cms_item_text.is-text');
-
-              // Kill any previous reveal timeline on this item (prevents double animation)
-              try { if (item.__bwRevealTL && item.__bwRevealTL.kill) item.__bwRevealTL.kill(); } catch (_) {}
-
-              var tl = window.gsap.timeline({
-                delay: index * delayIncrement,
-                defaults: { duration: 0.75, ease: 'power2.out' },
-                onComplete: function () { item.classList.remove('cms-item-initial'); }
-              });
-              item.__bwRevealTL = tl;
-
-              decodeDate.forEach(function (el) {
-                tl.add(function () { window.PortfolioDecode.decodeEffect(el, window.PortfolioDecode.randomCharacterDate, 1700); }, 0);
-              });
-              decodeText.forEach(function (el) {
-                tl.add(function () { window.PortfolioDecode.decodeEffect(el, window.PortfolioDecode.randomCharacterTag, 1700); }, 0);
-              });
-
-              tl.fromTo(decLineWrapper, { xPercent: -100 }, { xPercent: 0 }, 0);
-              tl.fromTo(lineBg, { xPercent: -100, opacity: 1 }, { xPercent: 0, opacity: 1 }, 0);
-              tl.fromTo(lineFill, { xPercent: 0, opacity: 1 }, { xPercent: 150, opacity: 1 }, 0)
-                .to(lineFill, { xPercent: -100, opacity: 0 }, '>0');
-            });
-          }
-        } catch (_) {}
-
-        // interactions are already bound during controller init; don't double-bind here
       }
 
-      // Run reveal AFTER the new page is actually revealed
-      var didRun = false;
-      function runOnce() {
-        if (didRun) return;
-        didRun = true;
-        runPortfolioReveal();
+      // bw24 contract: start portfolio reveal under the overlay (mid-enter)
+      function onMidEnter() {
+        window.removeEventListener('pageTransitionCompleted', onMidEnter);
+        waitForItems().then(function () {
+          WFApp._fsPortfolio.allowInit = true;
+          // initializePortfolioItems drives the reveal + decode + interactions and is also used by cmsload render events
+          resetPortfolioItems(container);
+          setTimeout(function () { initializePortfolioItems(); }, 50);
+        });
       }
-      window.addEventListener('pageTransitionCompleted', runOnce, { once: true });
-
-      // Fallback: if event doesn't fire for some reason
-      setTimeout(runOnce, 1400);
+      window.addEventListener('pageTransitionCompleted', onMidEnter, { once: true });
 
       return {
         destroy: function () {
