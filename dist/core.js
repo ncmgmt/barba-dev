@@ -157,12 +157,36 @@
 
   function ensureTransitionVisible() {
     var wrap = qs(CONFIG.transitionWrapSelector);
-    if (wrap) wrap.style.display = 'flex';
+    if (!wrap) return;
+    wrap.style.display = 'flex';
+
+    // Ensure the overlay actually hides the outgoing page.
+    // Some Webflow layouts leave the transition wrap background transparent.
+    // If columns don't fully cover for a frame, users can see the old page bleeding through.
+    try {
+      if (!wrap.dataset.bgSaved) {
+        wrap.dataset.bgSaved = '1';
+        wrap.dataset.bgPrev = wrap.style.backgroundColor || '';
+      }
+      // If no inline bg is set, provide a safe fallback while transitioning.
+      if (!wrap.style.backgroundColor) wrap.style.backgroundColor = '#000';
+    } catch (_) {}
   }
 
   function hideTransition() {
     var wrap = qs(CONFIG.transitionWrapSelector);
-    if (wrap) wrap.style.display = 'none';
+    if (!wrap) return;
+
+    // Restore background override (see ensureTransitionVisible)
+    try {
+      if (wrap.dataset && wrap.dataset.bgSaved) {
+        wrap.style.backgroundColor = wrap.dataset.bgPrev || '';
+        delete wrap.dataset.bgSaved;
+        delete wrap.dataset.bgPrev;
+      }
+    } catch (_) {}
+
+    wrap.style.display = 'none';
   }
 
   function logoAnimationOnce() {
