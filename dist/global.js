@@ -988,6 +988,14 @@
         });
       }
     } catch (_) {}
+    // Reset nav to visible state before re-init. Killing a ScrollTrigger does NOT
+    // revert animated properties — if the nav was hidden (y:-100%, opacity:0) from
+    // the old trigger, it stays hidden. Explicitly reset so the new trigger starts clean.
+    try {
+      if (window.gsap) {
+        window.gsap.set('.layout_nav_wrap', { y: '0%', opacity: 1 });
+      }
+    } catch (_) {}
     try { WFApp._navScrollTriggersInited = false; } catch (_) {}
     try { initNavScrollTriggersOnce(); } catch (_) {}
 

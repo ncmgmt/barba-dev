@@ -906,7 +906,11 @@
           splitInstances.forEach(function (s) { try { s.revert(); } catch (_) {} });
           splitInstances = [];
 
-          safeKillST();
+          // NOTE: Do NOT call safeKillST() here.
+          // safeKillST() kills ALL ScrollTriggers globally, including nav triggers
+          // from global.js. Killing nav triggers while the nav is hidden (y:-100%)
+          // leaves it stuck invisible. Home's triggers are already cleaned up by
+          // st.forEach, ctx.revert, and mm.kill above.
         }
       };
     }

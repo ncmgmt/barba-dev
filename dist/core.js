@@ -720,6 +720,22 @@
       ]);
     } catch (_) {}
 
+    // Webflow CSS uses .page_wrap[data-theme='dark'] selectors for themed elements
+    // (transition column backgrounds, nav toggle SVGs, etc.).
+    // Ensure data-theme is set on .page_wrap, not just on <html>.
+    try {
+      var pw = document.querySelector('.page_wrap');
+      if (pw) {
+        var theme = pw.getAttribute('data-theme');
+        if (!theme) {
+          theme = document.documentElement.getAttribute('data-theme')
+            || localStorage.getItem('theme')
+            || 'dark';
+          pw.setAttribute('data-theme', theme);
+        }
+      }
+    } catch (_) {}
+
     // Global safety: always close the main menu around navigations.
     // (The menu toggle can ignore clicks while its GSAP timeline is active.)
     try {
