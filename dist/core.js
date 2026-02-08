@@ -643,9 +643,12 @@
     try {
       var overlay = qs(CONFIG.transitionWrapSelector);
       if (!overlay) return;
-      var container = overlay.closest && overlay.closest('[data-barba="container"]');
-      if (container) {
-        document.body.appendChild(overlay);
+      var container = document.querySelector('[data-barba="container"]');
+      var wrapper = document.querySelector('[data-barba="wrapper"]');
+      if (!wrapper) return;
+      // If overlay is inside the container (would get swapped), move it to wrapper
+      if (container && container.contains(overlay)) {
+        wrapper.insertBefore(overlay, container);
       }
     } catch (_) {}
   }
@@ -678,14 +681,13 @@
     WFApp._barbaInited = true;
 
     // Ensure persistent layout elements are outside the swapped container.
-    // If selectors don’t exist, this is a no-op.
+    // If selectors don't exist, this is a no-op.
     try {
       persistTransitionOverlay();
       persistOutsideContainer([
+        '.layout_nav_wrap',
         'nav',
         '.w-nav',
-        '.navbar',
-        '.nav',
         'footer',
         '.footer'
       ]);
