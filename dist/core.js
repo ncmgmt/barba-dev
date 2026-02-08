@@ -638,6 +638,29 @@
     } catch (_) {}
   }
 
+  // After Barba swaps in new HTML, the incoming container may include duplicate
+  // nav/footer/overlay elements (because the source pages have them in their HTML).
+  // Remove any duplicates that ended up inside the container to prevent doubling.
+  function removeDuplicatePersisted(container) {
+    if (!container) return;
+    var selectors = [
+      CONFIG.transitionWrapSelector,
+      '.layout_nav_wrap',
+      'nav',
+      '.w-nav',
+      'footer',
+      '.footer'
+    ];
+    selectors.forEach(function (sel) {
+      try {
+        var dupes = container.querySelectorAll(sel);
+        for (var i = 0; i < dupes.length; i++) {
+          try { dupes[i].remove(); } catch (_) {}
+        }
+      } catch (_) {}
+    });
+  }
+
   // Ensure overlay wrapper is not inside the Barba container.
   function persistTransitionOverlay() {
     try {
@@ -855,6 +878,11 @@
             // Re-init Webflow interactions BEFORE revealing the new container.
             // This can take a few hundred ms; we keep the transition overlay up during this time.
             reinitWebflowIX2();
+
+            // Remove duplicate nav/footer/overlay from incoming container.
+            // The source page HTML includes these elements, but we already have
+            // the persisted originals outside the container.
+            try { removeDuplicatePersisted(data && data.next && data.next.container); } catch (_) {}
           },
           async enter(data) {
             // Start mounting controller early (under the overlay)
@@ -932,6 +960,19 @@
             if (window.ScrollTrigger && typeof window.ScrollTrigger.refresh === 'function') {
               try { window.ScrollTrigger.refresh(); } catch (_) {}
             }
+
+            // Defensive re-persistence: ensure persistent elements are still outside container.
+            // This catches edge cases where Barba's DOM manipulation may have moved them.
+            try {
+              persistTransitionOverlay();
+              persistOutsideContainer([
+                '.layout_nav_wrap',
+                'nav',
+                '.w-nav',
+                'footer',
+                '.footer'
+              ]);
+            } catch (_) {}
 
             tryGlobalAfterEnter(data);
 
