@@ -855,7 +855,7 @@
             reinitWebflowIX2();
           },
           async enter(data) {
-            // Start mounting controller early but don't block the reveal.
+            // Start mounting controller early (under the overlay)
             var ns = getNamespace(data, 'next');
             var mountPromise = mountNamespace(ns, data.next.container, data);
 
@@ -863,7 +863,7 @@
             // Each page controller must explicitly call WFApp.ready.signal(token)
             // when it is actually ready to be revealed.
 
-            // Let the swapped DOM paint before we animate reveal.
+            // Let the swapped DOM paint. (At this point, Barba may not have finalized the live container yet.)
             await waitForPaint();
 
             // New hook: DOM swapped + IX2 ready, overlay still up.
@@ -879,31 +879,23 @@
             // Optional extra hold (fine-tune perceived alignment)
             try { if (CONFIG.internalRevealDelayMs) await delay(CONFIG.internalRevealDelayMs); } catch (_) {}
 
-            // Start reveal animation (overlay out + container fade).
-            await animateEnter(data.next && data.next.container);
-
-            // Ensure controller is mounted before firing post-reveal hook.
+            // Ensure controller is mounted before we reveal.
             await mountPromise;
-            // Post-reveal hook (new). pageTransitionCompleted fires mid-enter like bw24.
-            try { window.dispatchEvent(new CustomEvent('pageTransitionAfterReveal')); } catch (_) {}
 
-            // Ensure final visibility (beforeEnter set it hidden to avoid IX2 flicker)
-            try {
-              if (data && data.next && data.next.container) {
-                data.next.container.style.opacity = '1';
-                data.next.container.style.visibility = 'visible';
-              }
-            } catch (_) {}
-
-            // Do NOT hide the overlay here.
-            // We'll finalize (hide overlay + unlock body) in the global `after` hook,
-            // because the live container can still be style-hidden until Barba completes the swap.
+            // IMPORTANT:
+            // Do NOT run animateEnter() here.
+            // During internal navigations, Barba's "live" container selector can still be the outgoing container
+            // (often already hidden) until the `after` hook. Revealing the overlay before that causes a brief
+            // background-only gap.
+            // We defer the actual reveal animation to the global `after` hook (post-swap).
+            WFApp._pendingInternalReveal = true;
           },
           async after(data) {
             // At this point Barba has completed the swap; the live container is stable.
             // Ensure it is visible (some pages/IX2 can leave inline hidden styles briefly).
+            var live = null;
             try {
-              var live = document.querySelector('[data-barba="container"]');
+              live = document.querySelector('[data-barba="container"]');
               if (live) {
                 live.style.opacity = '1';
                 live.style.visibility = 'visible';
@@ -912,12 +904,20 @@
                   var cs = getComputedStyle(live);
                   if (cs && cs.display === 'none') live.style.display = 'block';
                 } catch (_) {}
-
               }
             } catch (_) {}
 
-            // Let the browser paint the new page before removing the overlay.
+            // Let the browser paint the swapped DOM once.
             try { await waitForPaint(); } catch (_) {}
+
+            // If an internal navigation is pending reveal, do it ONLY after swap is complete.
+            if (WFApp._pendingInternalReveal) {
+              WFApp._pendingInternalReveal = false;
+              try {
+                await animateEnter(live);
+              } catch (_) {}
+              try { window.dispatchEvent(new CustomEvent('pageTransitionAfterReveal')); } catch (_) {}
+            }
 
             // Finalize transition.
             // IMPORTANT: unlocking scroll (changing overflow styles) can cause a brief reflow/blank gap.
