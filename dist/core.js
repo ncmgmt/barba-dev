@@ -21,13 +21,24 @@
     // Readiness gate: keep the transition overlay up until the new page signals it is ready.
     // Prevents gaps when scripts/CMS load late.
     readyTimeoutMs: 4000,
-    // Optional extra hold after ready (helps align overlay reveal with page animations)
-    // You can override from Webflow before loading core.js:
-    // window.WFAPP_REVEAL_DELAY_MS = 750;
-    revealDelayMs:
-      (typeof window.WFAPP_REVEAL_DELAY_MS === 'number' && isFinite(window.WFAPP_REVEAL_DELAY_MS)
-        ? window.WFAPP_REVEAL_DELAY_MS
-        : 500),
+    // Extra hold after ready but before reveal.
+    // Split into initial (hard reload) vs internal (Barba navigation).
+    // Override from Webflow before loading core.js:
+    //   window.WFAPP_REVEAL_DELAY_MS_INITIAL = 500;   // first load
+    //   window.WFAPP_REVEAL_DELAY_MS_INTERNAL = 500;  // internal nav
+    //   window.WFAPP_REVEAL_DELAY_MS = 500;           // legacy fallback for both
+    initialRevealDelayMs:
+      (typeof window.WFAPP_REVEAL_DELAY_MS_INITIAL === 'number' && isFinite(window.WFAPP_REVEAL_DELAY_MS_INITIAL)
+        ? window.WFAPP_REVEAL_DELAY_MS_INITIAL
+        : (typeof window.WFAPP_REVEAL_DELAY_MS === 'number' && isFinite(window.WFAPP_REVEAL_DELAY_MS)
+          ? window.WFAPP_REVEAL_DELAY_MS
+          : 500)),
+    internalRevealDelayMs:
+      (typeof window.WFAPP_REVEAL_DELAY_MS_INTERNAL === 'number' && isFinite(window.WFAPP_REVEAL_DELAY_MS_INTERNAL)
+        ? window.WFAPP_REVEAL_DELAY_MS_INTERNAL
+        : (typeof window.WFAPP_REVEAL_DELAY_MS === 'number' && isFinite(window.WFAPP_REVEAL_DELAY_MS)
+          ? window.WFAPP_REVEAL_DELAY_MS
+          : 500)),
 
     // jsDelivr base for page controllers.
     // If you prefer: set this from Webflow before loading core.js:
@@ -755,7 +766,7 @@
               await Promise.race([p, delay(CONFIG.readyTimeoutMs)]);
             } catch (_) {}
 
-            try { if (CONFIG.revealDelayMs) await delay(CONFIG.revealDelayMs); } catch (_) {}
+            try { if (CONFIG.initialRevealDelayMs) await delay(CONFIG.initialRevealDelayMs); } catch (_) {}
 
             await animateEnter(data.next && data.next.container);
 
@@ -866,7 +877,7 @@
             } catch (_) {}
 
             // Optional extra hold (fine-tune perceived alignment)
-            try { if (CONFIG.revealDelayMs) await delay(CONFIG.revealDelayMs); } catch (_) {}
+            try { if (CONFIG.internalRevealDelayMs) await delay(CONFIG.internalRevealDelayMs); } catch (_) {}
 
             // Start reveal animation (overlay out + container fade).
             await animateEnter(data.next && data.next.container);
