@@ -576,6 +576,15 @@
     WFApp._navScrollTriggersInited = true;
     if (!window.gsap || !window.ScrollTrigger) return;
 
+    // Update body data-page from current Barba namespace (Barba doesn't update body attrs)
+    try {
+      var currentContainer = document.querySelector('[data-barba="container"]');
+      if (currentContainer) {
+        var ns = currentContainer.getAttribute('data-barba-namespace');
+        if (ns) document.body.setAttribute('data-page', ns.toLowerCase());
+      }
+    } catch (_) {}
+
     // Hide nav when footer becomes visible
     try {
       window.gsap.to('.layout_nav_wrap', {
@@ -583,6 +592,7 @@
         opacity: 0,
         ease: 'sine.inOut',
         scrollTrigger: {
+          id: 'nav-hide-on-footer',
           trigger: '.content_wrap',
           start: 'bottom 85%',
           end: 'bottom 50%',
@@ -611,6 +621,7 @@
           },
           ease: 'sine.inOut',
           scrollTrigger: {
+            id: 'nav-backdrop-blur',
             trigger: '.page_wrap',
             start: 'top top-=10',
             end: 'top 97%',
@@ -966,12 +977,13 @@
     initDecodeUI(root);
 
     // nav scroll triggers depend on body[data-page] and page markup; rebuild after swap
+    // Kill stale nav ScrollTriggers before re-init (they reference old DOM positions)
     try {
       if (window.ScrollTrigger && typeof window.ScrollTrigger.getAll === 'function') {
         window.ScrollTrigger.getAll().forEach(function (t) {
           try {
-            var trig = t && t.vars ? t.vars.trigger : null;
-            if (trig === '.content_wrap' || trig === '.page_wrap') t.kill();
+            var id = t.vars && t.vars.id;
+            if (id === 'nav-hide-on-footer' || id === 'nav-backdrop-blur') t.kill();
           } catch (_) {}
         });
       }

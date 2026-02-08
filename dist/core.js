@@ -568,6 +568,10 @@
             }
           }
 
+          // NOTE: This safely preserves nav/footer ScrollTriggers because their
+          // animation targets (.layout_nav_wrap) live outside the container,
+          // even though their trigger elements (.content_wrap, .page_wrap) are inside.
+
           t.kill();
         } catch (_) {}
       });
