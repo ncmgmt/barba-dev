@@ -22,7 +22,12 @@
     // Prevents gaps when scripts/CMS load late.
     readyTimeoutMs: 4000,
     // Optional extra hold after ready (helps align overlay reveal with page animations)
-    revealDelayMs: 500,
+    // You can override from Webflow before loading core.js:
+    // window.WFAPP_REVEAL_DELAY_MS = 750;
+    revealDelayMs:
+      (typeof window.WFAPP_REVEAL_DELAY_MS === 'number' && isFinite(window.WFAPP_REVEAL_DELAY_MS)
+        ? window.WFAPP_REVEAL_DELAY_MS
+        : 500),
 
     // jsDelivr base for page controllers.
     // If you prefer: set this from Webflow before loading core.js:
