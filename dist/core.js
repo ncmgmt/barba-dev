@@ -601,6 +601,39 @@
     }
   }
 
+  // ---- Persist layout elements that must NOT be swapped ----
+  // If Webflow structure accidentally places nav/footer/transition overlay inside the Barba container,
+  // Barba will swap/remove them during navigation. That matches the observed "nav disappears" issue.
+  function persistOutsideContainer(selectors) {
+    try {
+      var container = document.querySelector('[data-barba="container"]');
+      var wrapper = document.querySelector('[data-barba="wrapper"]');
+      if (!container || !wrapper) return;
+      (selectors || []).forEach(function (sel) {
+        try {
+          var el = document.querySelector(sel);
+          if (!el) return;
+          if (container.contains(el)) {
+            // Insert before container so it remains within wrapper but outside the swapped container.
+            wrapper.insertBefore(el, container);
+          }
+        } catch (_) {}
+      });
+    } catch (_) {}
+  }
+
+  // Ensure overlay wrapper is not inside the Barba container.
+  function persistTransitionOverlay() {
+    try {
+      var overlay = qs(CONFIG.transitionWrapSelector);
+      if (!overlay) return;
+      var container = overlay.closest && overlay.closest('[data-barba="container"]');
+      if (container) {
+        document.body.appendChild(overlay);
+      }
+    } catch (_) {}
+  }
+
   // ---- Optional global hook file (dist/global.js) ----
 
   function tryInitGlobalOnce() {
@@ -627,6 +660,20 @@
       return;
     }
     WFApp._barbaInited = true;
+
+    // Ensure persistent layout elements are outside the swapped container.
+    // If selectors don’t exist, this is a no-op.
+    try {
+      persistTransitionOverlay();
+      persistOutsideContainer([
+        'nav',
+        '.w-nav',
+        '.navbar',
+        '.nav',
+        'footer',
+        '.footer'
+      ]);
+    } catch (_) {}
 
     // Global safety: always close the main menu around navigations.
     // (The menu toggle can ignore clicks while its GSAP timeline is active.)
@@ -760,7 +807,14 @@
             await animateLeave();
 
             // Now the columns cover the viewport: safe to jump to top without being visible.
-            try { window.scrollTo(0, 0); } catch (_) {}
+            // Also guard against global `scroll-behavior:smooth` which can animate programmatic scroll.
+            try {
+              var de = document.documentElement;
+              var prev = de.style.scrollBehavior;
+              de.style.scrollBehavior = 'auto';
+              window.scrollTo(0, 0);
+              requestAnimationFrame(function () { de.style.scrollBehavior = prev || ''; });
+            } catch (_) {}
 
             // Now that the overlay fully covers the screen, hide the outgoing container.
             // This prevents the old page from bleeding through during the reveal of the next page.
@@ -837,7 +891,12 @@
               if (live) {
                 live.style.opacity = '1';
                 live.style.visibility = 'visible';
-                if (!live.style.display) live.style.display = 'block';
+                // Do not force display:block blindly; it can override flex/grid and cause a reflow.
+                try {
+                  var cs = getComputedStyle(live);
+                  if (cs && cs.display === 'none') live.style.display = 'block';
+                } catch (_) {}
+
               }
             } catch (_) {}
 
