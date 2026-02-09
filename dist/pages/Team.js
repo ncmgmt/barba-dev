@@ -12,6 +12,7 @@
       var splitInstances = [];
       var listeners = [];
       var st = [];
+      var blockRevealHandles = [];
 
       // Capture readiness token at init-time to avoid late signals resolving a newer navigation.
       var readyToken = 0;
@@ -288,7 +289,27 @@
                     trigger: card,
                     start: 'top 80%',
                     end: 'bottom 20%',
-                    toggleActions: 'play none none reverse'
+                    toggleActions: 'play none none reverse',
+                    onEnter: function () {
+                      // Block reveal for card image (matches Home page team Swiper visual effect)
+                      // holdMs: 180 (10% faster than Home's 210ms for scroll-triggered vs user-initiated reveals)
+                      if (window.BWBlockReveal && typeof window.BWBlockReveal.coverAndReveal === 'function') {
+                        var handle = window.BWBlockReveal.coverAndReveal({
+                          slideOrContainer: card,
+                          containerSelector: '.layout_team_visual_wrap',
+                          imgSelector: '.layout_team_visual_wrap > img.image',
+                          holdMs: 180,
+                          baseStagger: 3,
+                          fadeMs: 80,
+                          burstEvery: 18,
+                          burstDelay: 10,
+                          clusterCount: 6,
+                          clusterRadius: 1,
+                          blinkMs: 45
+                        });
+                        if (handle) blockRevealHandles.push(handle);
+                      }
+                    }
                   }
                 });
 
@@ -410,6 +431,12 @@
             try { x[0].removeEventListener(x[1], x[2], x[3]); } catch (_) {}
           });
           listeners = [];
+
+          // Cleanup block reveal handles before ctx.revert()
+          blockRevealHandles.forEach(function (h) {
+            try { if (h && h.cleanup) h.cleanup(); } catch (_) {}
+          });
+          blockRevealHandles = [];
 
           if (mmBg) {
             try { mmBg.kill(); } catch (_) {}
