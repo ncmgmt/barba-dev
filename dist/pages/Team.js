@@ -302,12 +302,36 @@
                 var oldGrid = imgEl.querySelector('.bw-blockreveal__grid');
                 if (oldGrid) oldGrid.remove();
 
-                gsap.to(infoEl, {
-                  opacity: 0,
-                  clipPath: 'inset(100% 0% 0% 0%)',
-                  duration: 0.5,
-                  ease: 'power2.in'
-                });
+                // Block reveal transition out (grid covers, then info hides, then grid dissolves)
+                if (window.BWBlockReveal && typeof window.BWBlockReveal.blockReveal === 'function') {
+                  if (getComputedStyle(imgEl).position === 'static') {
+                    imgEl.style.position = 'relative';
+                  }
+                  var handle = window.BWBlockReveal.blockReveal(imgEl, {
+                    px: 28,
+                    holdMs: 200,
+                    baseStagger: 3,
+                    fadeMs: 70,
+                    burstEvery: 14,
+                    burstDelay: 10,
+                    clusterCount: 6,
+                    clusterRadius: 1,
+                    blinkMs: 45
+                  });
+                  if (handle) blockRevealHandles.push(handle);
+
+                  // While grid is solid, hide info panel underneath
+                  setTimeout(function () {
+                    gsap.set(infoEl, { opacity: 0, clipPath: 'inset(100% 0% 0% 0%)' });
+                  }, 80);
+                } else {
+                  gsap.to(infoEl, {
+                    opacity: 0,
+                    clipPath: 'inset(100% 0% 0% 0%)',
+                    duration: 0.5,
+                    ease: 'power2.in'
+                  });
+                }
               }
 
               teamCards.forEach(function (card, index) {

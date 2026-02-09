@@ -586,7 +586,7 @@
       var style = document.createElement('style');
       style.id = 'bw-blockreveal-style';
       style.textContent = '.bw-blockreveal__grid{position:absolute;inset:0;pointer-events:none;z-index:9999;display:grid}' +
-        '.bw-blockreveal__cell{background:var(--theme--gradient);opacity:1;will-change:opacity}';
+        '.bw-blockreveal__cell{background:var(--theme--card-bg);opacity:1;will-change:opacity}';
       document.head.appendChild(style);
     }
 
