@@ -12,6 +12,7 @@
       var splitInstances = [];
       var listeners = [];
       var st = [];
+      var blockRevealHandles = [];
 
       // Capture readiness token at init-time to avoid late signals resolving a newer navigation.
       var readyToken = 0;
@@ -258,23 +259,50 @@
               }
 
               // Team cards: reveal + info + click toggle of cardInfo
-              var activeCardInfo = null;
+              // activeCard tracks { img, info } for the currently open card
+              var activeCard = null;
 
               teamCards.forEach(function (card) {
                 gsap.set(card, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
               });
 
-              function openCardInfo(cardInfo) {
-                gsap.to(cardInfo, {
+              // Block reveal on IMAGE wrapper only, info panel fades in separately.
+              function openCardInfo(imgEl, infoEl) {
+                // Block reveal transition on the photo
+                if (window.BWBlockReveal && typeof window.BWBlockReveal.blockReveal === 'function') {
+                  if (getComputedStyle(imgEl).position === 'static') {
+                    imgEl.style.position = 'relative';
+                  }
+                  var handle = window.BWBlockReveal.blockReveal(imgEl, {
+                    px: 28,
+                    holdMs: 200,
+                    baseStagger: 3,
+                    fadeMs: 70,
+                    burstEvery: 14,
+                    burstDelay: 10,
+                    clusterCount: 6,
+                    clusterRadius: 1,
+                    blinkMs: 45
+                  });
+                  if (handle) blockRevealHandles.push(handle);
+                }
+
+                // Info panel slides in (slight delay so block reveal starts first)
+                gsap.to(infoEl, {
                   opacity: 1,
-                  clipPath: 'inset(-5% -5% -5% -5%)',
+                  clipPath: 'inset(0% 0% 0% 0%)',
                   duration: 0.5,
+                  delay: 0.12,
                   ease: 'power2.out'
                 });
               }
 
-              function closeCardInfo(cardInfo) {
-                gsap.to(cardInfo, {
+              function closeCardInfo(imgEl, infoEl) {
+                // Clean up leftover grid on image wrapper
+                var oldGrid = imgEl.querySelector('.bw-blockreveal__grid');
+                if (oldGrid) oldGrid.remove();
+
+                gsap.to(infoEl, {
                   opacity: 0,
                   clipPath: 'inset(100% 0% 0% 0%)',
                   duration: 0.5,
@@ -324,17 +352,17 @@
                 var info = teamCardInfos[index];
                 if (img && info) {
                   on(img, 'click', function () {
-                    if (activeCardInfo && activeCardInfo !== info) {
-                      closeCardInfo(activeCardInfo);
+                    if (activeCard && activeCard.info !== info) {
+                      closeCardInfo(activeCard.img, activeCard.info);
                     }
 
                     var op = gsap.getProperty(info, 'opacity');
                     if (Number(op) === 0) {
-                      openCardInfo(info);
-                      activeCardInfo = info;
+                      openCardInfo(img, info);
+                      activeCard = { img: img, info: info };
                     } else {
-                      closeCardInfo(info);
-                      activeCardInfo = null;
+                      closeCardInfo(img, info);
+                      activeCard = null;
                     }
                   });
 
@@ -344,9 +372,9 @@
                     start: 'bottom bottom',
                     end: 'top top',
                     onLeave: function () {
-                      if (activeCardInfo === info) {
-                        closeCardInfo(info);
-                        activeCardInfo = null;
+                      if (activeCard && activeCard.info === info) {
+                        closeCardInfo(activeCard.img, activeCard.info);
+                        activeCard = null;
                       }
                     }
                   }));
@@ -410,6 +438,12 @@
             try { x[0].removeEventListener(x[1], x[2], x[3]); } catch (_) {}
           });
           listeners = [];
+
+          // Cleanup block reveal handles before ctx.revert()
+          blockRevealHandles.forEach(function (h) {
+            try { if (h && h.cleanup) h.cleanup(); } catch (_) {}
+          });
+          blockRevealHandles = [];
 
           if (mmBg) {
             try { mmBg.kill(); } catch (_) {}
