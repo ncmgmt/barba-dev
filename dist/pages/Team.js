@@ -97,10 +97,12 @@
 
               // Transparent bg — solid block-reveal cells behind the info panel
               // ARE the visual background when the card is open.
+              // overflow-y: auto makes the panel scrollable when content exceeds height.
               teamCardInfos.forEach(function (info) {
                 gsap.set(info, {
                   backgroundImage: 'none',
-                  backgroundColor: 'transparent'
+                  backgroundColor: 'transparent',
+                  overflowY: 'auto'
                 });
               });
 
@@ -494,9 +496,19 @@
                   }
                 }));
 
-                // Click toggle — block reveal fires on img (covers image area only)
+                // Hover on card image → trigger decode on name
                 var img = teamCardImgs[index];
                 var info = teamCardInfos[index];
+                if (img) {
+                  on(img, 'mouseenter', function () {
+                    if (window.hoverEffect) {
+                      var nameEl = card.querySelector('[data-hover-effect="true"]');
+                      if (nameEl) window.hoverEffect(nameEl);
+                    }
+                  });
+                }
+
+                // Click toggle — block reveal fires on img (covers image area only)
                 if (img && info) {
                   on(img, 'click', function () {
                     if (activeCard && activeCard.info !== info) {
