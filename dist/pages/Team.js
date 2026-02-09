@@ -103,10 +103,14 @@
                   backgroundImage: 'none',
                   backgroundColor: 'transparent'
                 });
-                // Webflow sets overflow:clip which blocks scroll entirely.
-                // Override both axes (clip can't mix with auto on opposite axis).
+                // overflow:clip (Webflow default) prevents ALL scrolling in the
+                // subtree — unlike hidden it doesn't create a scroll container.
+                // Override to hidden auto on the panel + hidden on its parent
+                // (.card_top_wrap) so vertical scroll works inside the panel.
                 info.style.overflow = 'hidden auto';
                 info.style.maxHeight = '100%';
+                var topWrap = info.closest('.card_top_wrap');
+                if (topWrap) topWrap.style.overflow = 'hidden';
               });
 
               // Title split + reveal
