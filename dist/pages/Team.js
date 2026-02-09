@@ -316,13 +316,16 @@
                     }
                   );
 
-                  // Text scramble — decode each text element inside the info panel
+                  // Text scramble — decode every leaf text element in the info panel.
+                  // Targets any element with text and no child elements (actual labels).
                   if (window.decodeEffect) {
                     var rand = window.randomCharacterDigital || window.randomCharacterTag;
-                    var textEls = qsa('.card_info_position', infoEl);
-                    textEls.forEach(function (el) {
-                      el.style.opacity = '1';
-                      el.style.visibility = 'visible';
+                    var allEls = Array.prototype.slice.call(infoEl.querySelectorAll('*'));
+                    allEls.forEach(function (el) {
+                      var tag = el.tagName;
+                      if (tag === 'STYLE' || tag === 'SCRIPT' || tag === 'SVG' || tag === 'IMG') return;
+                      if (el.children.length > 0) return;
+                      if (!el.textContent || !el.textContent.trim()) return;
                       window.decodeEffect(el, rand, 900, false, 'forward', true);
                     });
                   }
@@ -343,10 +346,11 @@
                   onComplete: function () {
                     gsap.set(infoEl, { clipPath: 'inset(100% 0 0 0)' });
                     // Reset decoded text so it can scramble again on next open
-                    var textEls = qsa('.card_info_position', infoEl);
-                    textEls.forEach(function (el) {
-                      var orig = el.dataset.originalText;
-                      if (orig !== undefined) el.textContent = orig;
+                    var allEls = Array.prototype.slice.call(infoEl.querySelectorAll('*'));
+                    allEls.forEach(function (el) {
+                      if (el.dataset.originalText !== undefined) {
+                        el.textContent = el.dataset.originalText;
+                      }
                     });
                   }
                 });
