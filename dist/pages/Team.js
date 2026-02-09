@@ -309,7 +309,27 @@
                     trigger: card,
                     start: 'top 80%',
                     end: 'bottom 20%',
-                    toggleActions: 'play none none reverse'
+                    toggleActions: 'play none none reverse',
+                    onEnter: function () {
+                      // Block reveal on card scroll-in for visual consistency with Home page team Swiper
+                      // holdMs: 180 (vs Home's 210) -- 10% faster for scroll-triggered reveals (passive) vs user-initiated Swiper slides
+                      if (window.BWBlockReveal && typeof window.BWBlockReveal.coverAndReveal === 'function') {
+                        var handle = window.BWBlockReveal.coverAndReveal({
+                          slideOrContainer: card,
+                          containerSelector: '.layout_team_visual_wrap',
+                          imgSelector: '.layout_team_visual_wrap > img.image',
+                          holdMs: 180,
+                          baseStagger: 3,
+                          fadeMs: 80,
+                          burstEvery: 18,
+                          burstDelay: 10,
+                          clusterCount: 6,
+                          clusterRadius: 1,
+                          blinkMs: 45
+                        });
+                        if (handle) blockRevealHandles.push(handle);
+                      }
+                    }
                   }
                 });
 
