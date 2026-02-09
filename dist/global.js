@@ -596,7 +596,7 @@
 
       opts = opts || {};
 
-      var px = (opts.px !== undefined && opts.px !== null) ? opts.px : 32;
+      var px = (opts.px !== undefined && opts.px !== null) ? opts.px : cssVarToPx('--block--size', 32);
       var min = (opts.min !== undefined && opts.min !== null) ? opts.min : 8;
       var max = (opts.max !== undefined && opts.max !== null) ? opts.max : 32;
 

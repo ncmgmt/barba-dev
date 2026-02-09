@@ -277,7 +277,7 @@
               // Cells stagger in (coverMs), blink, then stay solid (coverOnly).
               // Caller triggers handle.dissolve() on close to fade cells out.
               var blockRevealOpts = {
-                px: 40, coverMs: 70, holdMs: 200, baseStagger: 3, fadeMs: 90,
+                coverMs: 70, holdMs: 200, baseStagger: 3, fadeMs: 90,
                 burstEvery: 14, burstDelay: 10, clusterCount: 6,
                 clusterRadius: 1, blinkMs: 50, coverOnly: true
               };
