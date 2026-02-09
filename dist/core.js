@@ -862,6 +862,22 @@
 
             // Kill only ScrollTriggers that belong to the outgoing container.
             try { killScrollTriggersIn(data && data.current && data.current.container); } catch (_) {}
+
+            // Kill nav ScrollTriggers early (before DOM swap) to prevent false triggering.
+            // During swap, content_wrap may temporarily collapse, causing the footer-hide
+            // trigger to fire and hide the nav mid-transition. Reset nav to visible state.
+            try {
+              if (window.ScrollTrigger && typeof window.ScrollTrigger.getAll === 'function') {
+                window.ScrollTrigger.getAll().forEach(function (t) {
+                  try {
+                    var id = t.vars && t.vars.id;
+                    if (id === 'nav-hide-on-footer' || id === 'nav-backdrop-blur') t.kill();
+                  } catch (_) {}
+                });
+              }
+              if (window.gsap) window.gsap.set('.layout_nav_wrap', { y: '0%', opacity: 1 });
+            } catch (_) {}
+
             unmountNamespace(getNamespace(data, 'current'));
 
             // Play leave animation BEFORE we swap content

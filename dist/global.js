@@ -665,6 +665,11 @@
 
       if (!menuEl || !menuWrapEl || !menuBaseEl) return;
 
+      // Fix: Webflow CSS uses background-color: var(--theme--gradient) on .nav_menu_base,
+      // but --theme--gradient resolves to linear-gradient() which background-color rejects.
+      // Use background (shorthand) so gradient values render correctly as the overlay backdrop.
+      try { menuBaseEl.style.background = 'var(--theme--gradient)'; } catch (_) {}
+
       var isOpen = false;
       var blocksCreated = false;
 
