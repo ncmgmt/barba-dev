@@ -266,38 +266,38 @@
                 gsap.set(card, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
               });
 
-              // Block reveal on IMAGE wrapper — grid flicker IS the transition.
-              // No clip-path slide; info panel appears/disappears via opacity only.
+              // Block reveal on CARD container — grid covers entire card area.
+              // Grid cells (z-index:9999) sit above both img and info panel.
+              // On open: info set visible immediately (behind grid), cells fade out to reveal text.
+              // On close: grid covers card, info hidden while cells are solid, cells fade to show image.
               var blockRevealOpts = {
                 px: 28, holdMs: 200, baseStagger: 3, fadeMs: 70,
                 burstEvery: 14, burstDelay: 10, clusterCount: 6,
                 clusterRadius: 1, blinkMs: 45
               };
 
-              function fireBlockReveal(imgEl) {
+              function fireBlockReveal(el) {
                 if (!window.BWBlockReveal || typeof window.BWBlockReveal.blockReveal !== 'function') return;
-                if (getComputedStyle(imgEl).position === 'static') {
-                  imgEl.style.position = 'relative';
+                if (getComputedStyle(el).position === 'static') {
+                  el.style.position = 'relative';
                 }
-                var handle = window.BWBlockReveal.blockReveal(imgEl, blockRevealOpts);
+                var handle = window.BWBlockReveal.blockReveal(el, blockRevealOpts);
                 if (handle) blockRevealHandles.push(handle);
               }
 
-              function openCardInfo(imgEl, infoEl) {
-                fireBlockReveal(imgEl);
-                // Show info after grid has flickered briefly — no clip-path, just fade
-                gsap.set(infoEl, { clipPath: 'inset(0% 0% 0% 0%)' });
-                setTimeout(function () {
-                  gsap.to(infoEl, { opacity: 1, duration: 0.18, ease: 'power1.out' });
-                }, 150);
+              function openCardInfo(card, infoEl) {
+                fireBlockReveal(card);
+                // Info panel visible immediately — hidden behind grid cells (z-index:9999).
+                // As cells fade out, text is revealed through the gaps.
+                gsap.set(infoEl, { clipPath: 'inset(0% 0% 0% 0%)', opacity: 1 });
               }
 
-              function closeCardInfo(imgEl, infoEl) {
-                var oldGrid = imgEl.querySelector('.bw-blockreveal__grid');
+              function closeCardInfo(card, infoEl) {
+                var oldGrid = card.querySelector('.bw-blockreveal__grid');
                 if (oldGrid) oldGrid.remove();
 
-                fireBlockReveal(imgEl);
-                // Hide info while grid is solid
+                fireBlockReveal(card);
+                // Hide info while grid cells are solid — user sees grid, not the info disappearing
                 setTimeout(function () {
                   gsap.set(infoEl, { opacity: 0 });
                 }, 80);
@@ -309,27 +309,7 @@
                     trigger: card,
                     start: 'top 80%',
                     end: 'bottom 20%',
-                    toggleActions: 'play none none reverse',
-                    onEnter: function () {
-                      // Block reveal on card scroll-in for visual consistency with Home page team Swiper
-                      // holdMs: 180 (vs Home's 210) -- 10% faster for scroll-triggered reveals (passive) vs user-initiated Swiper slides
-                      if (window.BWBlockReveal && typeof window.BWBlockReveal.coverAndReveal === 'function') {
-                        var handle = window.BWBlockReveal.coverAndReveal({
-                          slideOrContainer: card,
-                          containerSelector: '.layout_team_visual_wrap',
-                          imgSelector: '.layout_team_visual_wrap > img.image',
-                          holdMs: 180,
-                          baseStagger: 3,
-                          fadeMs: 80,
-                          burstEvery: 18,
-                          burstDelay: 10,
-                          clusterCount: 6,
-                          clusterRadius: 1,
-                          blinkMs: 45
-                        });
-                        if (handle) blockRevealHandles.push(handle);
-                      }
-                    }
+                    toggleActions: 'play none none reverse'
                   }
                 });
 
@@ -360,21 +340,21 @@
                   }
                 }));
 
-                // Click toggle
+                // Click toggle — block reveal fires on card (covers img + info area)
                 var img = teamCardImgs[index];
                 var info = teamCardInfos[index];
                 if (img && info) {
                   on(img, 'click', function () {
                     if (activeCard && activeCard.info !== info) {
-                      closeCardInfo(activeCard.img, activeCard.info);
+                      closeCardInfo(activeCard.card, activeCard.info);
                     }
 
                     var op = gsap.getProperty(info, 'opacity');
                     if (Number(op) === 0) {
-                      openCardInfo(img, info);
-                      activeCard = { img: img, info: info };
+                      openCardInfo(card, info);
+                      activeCard = { card: card, info: info };
                     } else {
-                      closeCardInfo(img, info);
+                      closeCardInfo(card, info);
                       activeCard = null;
                     }
                   });
@@ -386,7 +366,7 @@
                     end: 'top top',
                     onLeave: function () {
                       if (activeCard && activeCard.info === info) {
-                        closeCardInfo(activeCard.img, activeCard.info);
+                        closeCardInfo(activeCard.card, activeCard.info);
                         activeCard = null;
                       }
                     }
