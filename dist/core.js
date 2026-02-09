@@ -842,6 +842,14 @@
               }
             } catch (_) {}
 
+            // Cancel any active block reveal animations before navigation
+            // (prevents orphaned grid overlays and stale timer callbacks)
+            try {
+              if (window.BWBlockReveal && typeof window.BWBlockReveal.cleanupAll === 'function') {
+                window.BWBlockReveal.cleanupAll();
+              }
+            } catch (_) {}
+
             // Make sure the transition overlay is visible as early as possible.
             // If we hide the current container before the overlay is painted, users can see a brief blank gap.
             try {
