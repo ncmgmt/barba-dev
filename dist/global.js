@@ -614,6 +614,10 @@
       // Default 0 = legacy instant-cover behaviour.
       var coverMs = (opts.coverMs !== undefined && opts.coverMs !== null) ? opts.coverMs : 0;
 
+      // coverOnly: when true, cells cover and stay solid — no auto-dissolve.
+      // Call handle.dissolve() later to trigger the staggered fade-out.
+      var coverOnly = !!opts.coverOnly;
+
       var old = container.querySelector('.bw-blockreveal__grid');
       if (old) old.remove();
 
@@ -737,27 +741,30 @@
       }
 
       // --- Dissolve phase: staggered fade-out (offset by cover phase) ---
-      for (var k = 0; k < order.length; k++) {
-        var idx = order[k];
-        var cell = cells[idx];
-        var burst = burstEvery && k % burstEvery === 0 ? burstDelay : 0;
-        var delay = coverPhaseDuration + holdMs + k * baseStagger + burst;
+      // When coverOnly, skip auto-dissolve; caller triggers handle.dissolve().
+      if (!coverOnly) {
+        for (var k = 0; k < order.length; k++) {
+          var idx = order[k];
+          var cell = cells[idx];
+          var burst = burstEvery && k % burstEvery === 0 ? burstDelay : 0;
+          var delay = coverPhaseDuration + holdMs + k * baseStagger + burst;
 
-        (function (cell) {
-          var tid = setTimeout(function () {
-            if (!cell) return;
-            cell.style.transition = 'opacity ' + fadeMs + 'ms ease';
-            cell.style.opacity = '0';
-          }, delay);
-          timers.push(tid);
-        })(cell);
+          (function (cell) {
+            var tid = setTimeout(function () {
+              if (!cell) return;
+              cell.style.transition = 'opacity ' + fadeMs + 'ms ease';
+              cell.style.opacity = '0';
+            }, delay);
+            timers.push(tid);
+          })(cell);
+        }
+
+        var cleanupDelay = coverPhaseDuration + holdMs + order.length * baseStagger + Math.ceil(order.length / burstEvery) * burstDelay + fadeMs + 120;
+        var cleanupTimer = setTimeout(function () {
+          if (grid && grid.parentNode) grid.remove();
+        }, cleanupDelay);
+        timers.push(cleanupTimer);
       }
-
-      var cleanupDelay = coverPhaseDuration + holdMs + order.length * baseStagger + Math.ceil(order.length / burstEvery) * burstDelay + fadeMs + 120;
-      var cleanupTimer = setTimeout(function () {
-        if (grid && grid.parentNode) grid.remove();
-      }, cleanupDelay);
-      timers.push(cleanupTimer);
 
       function cleanup() {
         for (var i = 0; i < timers.length; i++) {
@@ -767,8 +774,36 @@
         removeFromRegistry(handle);
       }
 
+      // Manual dissolve for coverOnly mode — stagger cells out then remove grid.
+      function dissolve() {
+        for (var k = 0; k < order.length; k++) {
+          var idx = order[k];
+          var c = cells[idx];
+          var burst = burstEvery && k % burstEvery === 0 ? burstDelay : 0;
+          var delay = k * baseStagger + burst;
+
+          (function (c) {
+            var tid = setTimeout(function () {
+              if (!c) return;
+              c.style.transition = 'opacity ' + fadeMs + 'ms ease';
+              c.style.opacity = '0';
+            }, delay);
+            timers.push(tid);
+          })(c);
+        }
+
+        var dissolveCleanup = order.length * baseStagger +
+          Math.ceil(order.length / burstEvery) * burstDelay + fadeMs + 120;
+        var tid = setTimeout(function () {
+          if (grid && grid.parentNode) grid.remove();
+          removeFromRegistry(handle);
+        }, dissolveCleanup);
+        timers.push(tid);
+      }
+
       var handle = {
         cleanup: cleanup,
+        dissolve: dissolve,
         timers: timers,
         coverPhaseDuration: coverPhaseDuration
       };

@@ -95,14 +95,12 @@
               gsap.set(teamCardInfos, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
               gsap.set(cardInfoPositions, { opacity: 0 });
 
-              // Glassmorphism — semi-transparent bg lets block reveal cells show through.
-              // color-mix auto-adapts to light/dark theme via --theme--card-bg variable.
+              // Transparent bg — solid block-reveal cells behind the info panel
+              // ARE the visual background when the card is open.
               teamCardInfos.forEach(function (info) {
                 gsap.set(info, {
                   backgroundImage: 'none',
-                  backgroundColor: 'color-mix(in srgb, var(--theme--card-bg) 65%, transparent)',
-                  backdropFilter: 'blur(12px) saturate(1.2)',
-                  webkitBackdropFilter: 'blur(12px) saturate(1.2)'
+                  backgroundColor: 'transparent'
                 });
               });
 
@@ -276,19 +274,12 @@
                 gsap.set(card, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
               });
 
-              // Block reveal with coverMs: cells stagger IN to cover image,
-              // blink/hold, then stagger OUT to reveal what's underneath.
+              // Cells stagger in (coverMs), blink, then stay solid (coverOnly).
+              // Caller triggers handle.dissolve() on close to fade cells out.
               var blockRevealOpts = {
-                px: 28, coverMs: 70, holdMs: 200, baseStagger: 3, fadeMs: 90,
+                px: 40, coverMs: 70, holdMs: 200, baseStagger: 3, fadeMs: 90,
                 burstEvery: 14, burstDelay: 10, clusterCount: 6,
-                clusterRadius: 1, blinkMs: 50
-              };
-
-              // Tighter grid for text — smaller cells, snappier timing
-              var infoRevealOpts = {
-                px: 20, coverMs: 50, holdMs: 120, baseStagger: 2, fadeMs: 70,
-                burstEvery: 10, burstDelay: 8, clusterCount: 4,
-                clusterRadius: 1, blinkMs: 40
+                clusterRadius: 1, blinkMs: 50, coverOnly: true
               };
 
               function fireBlockReveal(el, opts) {
@@ -309,37 +300,33 @@
                 var listItem = getListItem(card);
                 if (listItem) listItem.classList.add('active');
 
-                // Cells stagger in over image, then after cover phase completes
-                // show info + block-reveal the text content.
+                // Cells stagger in over image and stay solid (coverOnly).
+                // Once covered, show text on top of the solid block surface.
                 var imgHandle = fireBlockReveal(imgEl);
                 var coverDone = (imgHandle && imgHandle.coverPhaseDuration) || 0;
 
                 setTimeout(function () {
                   gsap.set(infoEl, { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)' });
-                  fireBlockReveal(infoEl, infoRevealOpts);
                 }, coverDone);
+
+                return imgHandle;
               }
 
-              function closeCardInfo(imgEl, infoEl, card) {
+              function closeCardInfo(imgEl, infoEl, card, handle) {
                 var listItem = getListItem(card);
                 if (listItem) listItem.classList.remove('active');
 
-                // Reverse: cells cover text, panel fades during hold,
-                // then image cells cover + dissolve to uncover grayscale.
-                var infoHandle = fireBlockReveal(infoEl, infoRevealOpts);
-                var coverDone = (infoHandle && infoHandle.coverPhaseDuration) || 0;
+                // Text out, then dissolve the solid cells to uncover grayscale image.
+                gsap.to(infoEl, {
+                  opacity: 0,
+                  duration: 0.2,
+                  ease: 'power2.in',
+                  onComplete: function () {
+                    gsap.set(infoEl, { clipPath: 'inset(100% 0 0 0)' });
+                  }
+                });
 
-                setTimeout(function () {
-                  gsap.to(infoEl, {
-                    opacity: 0,
-                    duration: 0.3,
-                    ease: 'power2.in',
-                    onComplete: function () {
-                      gsap.set(infoEl, { clipPath: 'inset(100% 0 0 0)' });
-                    }
-                  });
-                  fireBlockReveal(imgEl);
-                }, coverDone);
+                if (handle && handle.dissolve) handle.dissolve();
               }
 
               teamCards.forEach(function (card, index) {
@@ -385,15 +372,15 @@
                 if (img && info) {
                   on(img, 'click', function () {
                     if (activeCard && activeCard.info !== info) {
-                      closeCardInfo(activeCard.img, activeCard.info, activeCard.card);
+                      closeCardInfo(activeCard.img, activeCard.info, activeCard.card, activeCard.handle);
                     }
 
                     var op = gsap.getProperty(info, 'opacity');
                     if (Number(op) === 0) {
-                      openCardInfo(img, info, card);
-                      activeCard = { img: img, info: info, card: card };
+                      var handle = openCardInfo(img, info, card);
+                      activeCard = { img: img, info: info, card: card, handle: handle };
                     } else {
-                      closeCardInfo(img, info, card);
+                      closeCardInfo(img, info, card, activeCard ? activeCard.handle : null);
                       activeCard = null;
                     }
                   });
@@ -405,7 +392,7 @@
                     end: 'top top',
                     onLeave: function () {
                       if (activeCard && activeCard.info === info) {
-                        closeCardInfo(activeCard.img, activeCard.info, activeCard.card);
+                        closeCardInfo(activeCard.img, activeCard.info, activeCard.card, activeCard.handle);
                         activeCard = null;
                       }
                     }
