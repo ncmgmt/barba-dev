@@ -552,6 +552,275 @@
     });
   }
 
+  // ---- Block Reveal Overlay (ported from bw24/bw-blockreveal.js) ----
+  var BWBlockReveal = (function () {
+    'use strict';
+    var activeReveals = [];
+
+    function cssVarToPx(varName, fallbackPx) {
+      try {
+        var root = document.documentElement;
+        var raw = getComputedStyle(root).getPropertyValue(varName).trim();
+        if (!raw) return fallbackPx;
+
+        if (/^\d+(\.\d+)?$/.test(raw)) {
+          var rem = parseFloat(raw);
+          var fontSize = parseFloat(getComputedStyle(root).fontSize) || 16;
+          return rem * fontSize;
+        }
+        if (raw.indexOf('rem') === raw.length - 3) {
+          var rem = parseFloat(raw);
+          var fontSize = parseFloat(getComputedStyle(root).fontSize) || 16;
+          return rem * fontSize;
+        }
+        if (raw.indexOf('px') === raw.length - 2) return parseFloat(raw);
+
+        return fallbackPx;
+      } catch (_) {
+        return fallbackPx;
+      }
+    }
+
+    function ensureStyles() {
+      if (document.getElementById('bw-blockreveal-style')) return;
+      var style = document.createElement('style');
+      style.id = 'bw-blockreveal-style';
+      style.textContent = '.bw-blockreveal__grid{position:absolute;inset:0;pointer-events:none;z-index:9999;display:grid}' +
+        '.bw-blockreveal__cell{background:var(--theme--gradient);opacity:1;will-change:opacity}';
+      document.head.appendChild(style);
+    }
+
+    function blockReveal(container, opts) {
+      if (!container) return;
+      ensureStyles();
+
+      opts = opts || {};
+
+      var px = (opts.px !== undefined && opts.px !== null) ? opts.px : 32;
+      var min = (opts.min !== undefined && opts.min !== null) ? opts.min : 8;
+      var max = (opts.max !== undefined && opts.max !== null) ? opts.max : 32;
+
+      var baseStagger = (opts.baseStagger !== undefined && opts.baseStagger !== null) ? opts.baseStagger : 3;
+      var fadeMs = (opts.fadeMs !== undefined && opts.fadeMs !== null) ? opts.fadeMs : 80;
+      var burstEvery = (opts.burstEvery !== undefined && opts.burstEvery !== null) ? opts.burstEvery : 18;
+      var burstDelay = (opts.burstDelay !== undefined && opts.burstDelay !== null) ? opts.burstDelay : 10;
+      var holdMs = (opts.holdMs !== undefined && opts.holdMs !== null) ? opts.holdMs : 180;
+
+      var clusterCount = (opts.clusterCount !== undefined && opts.clusterCount !== null) ? opts.clusterCount : 6;
+      var clusterRadius = (opts.clusterRadius !== undefined && opts.clusterRadius !== null) ? opts.clusterRadius : 1;
+      var blinkMs = (opts.blinkMs !== undefined && opts.blinkMs !== null) ? opts.blinkMs : 45;
+
+      var old = container.querySelector('.bw-blockreveal__grid');
+      if (old) old.remove();
+
+      if (getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+      }
+
+      var rect = container.getBoundingClientRect();
+      var cols = Math.max(min, Math.min(max, Math.round(rect.width / px)));
+      var rows = Math.max(min, Math.min(max, Math.round(rect.height / px)));
+
+      var grid = document.createElement('div');
+      grid.className = 'bw-blockreveal__grid';
+      grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+      grid.style.gridTemplateRows = 'repeat(' + rows + ', 1fr)';
+      container.appendChild(grid);
+
+      var total = cols * rows;
+      var cells = new Array(total);
+
+      for (var i = 0; i < total; i++) {
+        var cell = document.createElement('div');
+        cell.className = 'bw-blockreveal__cell';
+        cells[i] = cell;
+        grid.appendChild(cell);
+      }
+
+      var order = [];
+      for (var i = 0; i < total; i++) {
+        order.push(i);
+      }
+      for (var i = order.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = order[i];
+        order[i] = order[j];
+        order[j] = temp;
+      }
+
+      var timers = [];
+
+      function idxToRC(idx) {
+        return { r: Math.floor(idx / cols), c: idx % cols };
+      }
+
+      function rcToIdx(r, c) {
+        return r * cols + c;
+      }
+
+      function getClusterIndices(centerIdx) {
+        var rc = idxToRC(centerIdx);
+        var r = rc.r;
+        var c = rc.c;
+        var indices = [];
+        for (var dr = -clusterRadius; dr <= clusterRadius; dr++) {
+          for (var dc = -clusterRadius; dc <= clusterRadius; dc++) {
+            var rr = r + dr;
+            var cc = c + dc;
+            if (rr < 0 || rr >= rows || cc < 0 || cc >= cols) continue;
+
+            var isEdge = Math.abs(dr) === clusterRadius || Math.abs(dc) === clusterRadius;
+            if (isEdge && Math.random() < 0.45) continue;
+
+            indices.push(rcToIdx(rr, cc));
+          }
+        }
+        return indices;
+      }
+
+      var blinkStart = 40;
+      var blinkWindow = Math.max(120, holdMs);
+      for (var k = 0; k < clusterCount; k++) {
+        var center = order[Math.floor(Math.random() * order.length)];
+        var cluster = getClusterIndices(center);
+        var t = blinkStart + Math.random() * blinkWindow;
+
+        (function (cluster) {
+          var tid = setTimeout(function () {
+            for (var i = 0; i < cluster.length; i++) {
+              var idx = cluster[i];
+              var cell = cells[idx];
+              if (!cell || cell.style.opacity === '0') continue;
+
+              cell.style.transition = 'opacity ' + blinkMs + 'ms linear';
+              cell.style.opacity = '0.25';
+
+              (function (cell) {
+                var tid2 = setTimeout(function () {
+                  if (!cell || cell.style.opacity === '0') return;
+                  cell.style.opacity = '1';
+                }, blinkMs);
+                timers.push(tid2);
+              })(cell);
+            }
+          }, t);
+          timers.push(tid);
+        })(cluster);
+      }
+
+      for (var k = 0; k < order.length; k++) {
+        var idx = order[k];
+        var cell = cells[idx];
+        var burst = burstEvery && k % burstEvery === 0 ? burstDelay : 0;
+        var delay = holdMs + k * baseStagger + burst;
+
+        (function (cell) {
+          var tid = setTimeout(function () {
+            if (!cell) return;
+            cell.style.transition = 'opacity ' + fadeMs + 'ms ease';
+            cell.style.opacity = '0';
+          }, delay);
+          timers.push(tid);
+        })(cell);
+      }
+
+      var cleanupDelay = holdMs + order.length * baseStagger + Math.ceil(order.length / burstEvery) * burstDelay + fadeMs + 120;
+      var cleanupTimer = setTimeout(function () {
+        if (grid && grid.parentNode) grid.remove();
+      }, cleanupDelay);
+      timers.push(cleanupTimer);
+
+      function cleanup() {
+        for (var i = 0; i < timers.length; i++) {
+          clearTimeout(timers[i]);
+        }
+        if (grid && grid.parentNode) grid.remove();
+        removeFromRegistry(handle);
+      }
+
+      var handle = {
+        cleanup: cleanup,
+        timers: timers
+      };
+
+      activeReveals.push(handle);
+      return handle;
+    }
+
+    function coverAndReveal(params) {
+      params = params || {};
+      var root = params.slideOrContainer;
+      if (!root) return;
+
+      var containerSelector = params.containerSelector || '.layout_team_visual_wrap';
+      var imgSelector = params.imgSelector || '.layout_team_visual_wrap > img.image';
+      var wrap = root.querySelector ? root.querySelector(containerSelector) : null;
+      var img = root.querySelector ? root.querySelector(imgSelector) : null;
+      if (!wrap || !img) return;
+
+      if (getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
+
+      img.style.transition = 'none';
+      img.style.opacity = '0';
+
+      var isMobile = window.matchMedia('(max-width: 768px)').matches;
+      var basePx = cssVarToPx('--block--size', 32);
+      var blockPx = basePx * (isMobile ? 1.15 : 1);
+
+      var handle = blockReveal(wrap, {
+        px: blockPx,
+        baseStagger: (params.baseStagger !== undefined && params.baseStagger !== null) ? params.baseStagger : 3,
+        fadeMs: (params.fadeMs !== undefined && params.fadeMs !== null) ? params.fadeMs : 80,
+        burstEvery: (params.burstEvery !== undefined && params.burstEvery !== null) ? params.burstEvery : 18,
+        burstDelay: (params.burstDelay !== undefined && params.burstDelay !== null) ? params.burstDelay : 10,
+        holdMs: (params.holdMs !== undefined && params.holdMs !== null) ? params.holdMs : 180,
+        clusterCount: (params.clusterCount !== undefined && params.clusterCount !== null) ? params.clusterCount : (isMobile ? 4 : 6),
+        clusterRadius: (params.clusterRadius !== undefined && params.clusterRadius !== null) ? params.clusterRadius : 1,
+        blinkMs: (params.blinkMs !== undefined && params.blinkMs !== null) ? params.blinkMs : 45
+      });
+
+      requestAnimationFrame(function () {
+        img.style.transition = 'opacity 90ms linear';
+        img.style.opacity = '1';
+      });
+
+      return handle;
+    }
+
+    function cleanupAll() {
+      var copy = activeReveals.slice();
+      for (var i = 0; i < copy.length; i++) {
+        if (copy[i] && typeof copy[i].cleanup === 'function') {
+          copy[i].cleanup();
+        }
+      }
+      activeReveals = [];
+    }
+
+    function removeFromRegistry(handle) {
+      for (var i = 0; i < activeReveals.length; i++) {
+        if (activeReveals[i] === handle) {
+          activeReveals.splice(i, 1);
+          return;
+        }
+      }
+    }
+
+    return {
+      blockReveal: blockReveal,
+      coverAndReveal: coverAndReveal,
+      cleanupAll: cleanupAll,
+      cssVarToPx: cssVarToPx
+    };
+  })();
+
+  // Expose on WFApp.global
+  WFApp.global.blockReveal = BWBlockReveal.blockReveal;
+  WFApp.global.coverAndReveal = BWBlockReveal.coverAndReveal;
+
+  // Expose on window for backward compat (Home.js expects window.BWBlockReveal)
+  if (!window.BWBlockReveal) window.BWBlockReveal = BWBlockReveal;
+
   // ---- Menu helpers ----
   // We keep gsap_menu.js as an external global include for now.
   // Under Barba we must ensure it closes before navigation.
