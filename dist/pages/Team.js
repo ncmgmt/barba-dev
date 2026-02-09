@@ -266,18 +266,17 @@
                 gsap.set(card, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
               });
 
-              // openCardInfo: imgEl = [data-ts="img"], infoEl = [data-ts="info"]
-              // Block reveal grid covers the IMAGE, info panel fades in behind grid,
-              // grid dissolves to reveal the text.
-              function openCardInfo(imgEl, infoEl) {
+              // Block reveal grid on the CARD covers everything (image + info area).
+              // While grid is solid → make info visible underneath.
+              // Grid dissolves → reveals the text content.
+              function openCardInfo(card, infoEl) {
                 if (window.BWBlockReveal && typeof window.BWBlockReveal.blockReveal === 'function') {
-                  // Ensure image wrapper can hold the grid overlay
-                  if (getComputedStyle(imgEl).position === 'static') {
-                    imgEl.style.position = 'relative';
+                  if (getComputedStyle(card).position === 'static') {
+                    card.style.position = 'relative';
                   }
 
-                  // 1. Block reveal grid covers the image (solid, opaque)
-                  var handle = window.BWBlockReveal.blockReveal(imgEl, {
+                  // 1. Grid covers the entire card (image + all overlays)
+                  var handle = window.BWBlockReveal.blockReveal(card, {
                     px: 28,
                     holdMs: 250,
                     baseStagger: 3,
@@ -290,12 +289,12 @@
                   });
                   if (handle) blockRevealHandles.push(handle);
 
-                  // 2. While grid is still solid (after short delay), show info panel underneath
+                  // 2. While grid is still solid, show info panel underneath
                   setTimeout(function () {
                     gsap.set(infoEl, { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)' });
-                  }, 100);
+                  }, 80);
                 } else {
-                  // Fallback without block reveal
+                  // Fallback
                   gsap.to(infoEl, {
                     opacity: 1,
                     clipPath: 'inset(-5% -5% -5% -5%)',
@@ -305,9 +304,9 @@
                 }
               }
 
-              function closeCardInfo(imgEl, infoEl) {
-                // Clean up any leftover block reveal grid on the image
-                var oldGrid = imgEl.querySelector('.bw-blockreveal__grid');
+              function closeCardInfo(card, infoEl) {
+                // Clean up leftover grid
+                var oldGrid = card.querySelector('.bw-blockreveal__grid');
                 if (oldGrid) oldGrid.remove();
 
                 gsap.to(infoEl, {
@@ -364,15 +363,15 @@
                 if (img && info) {
                   on(img, 'click', function () {
                     if (activeCard && activeCard.info !== info) {
-                      closeCardInfo(activeCard.img, activeCard.info);
+                      closeCardInfo(activeCard.card, activeCard.info);
                     }
 
                     var op = gsap.getProperty(info, 'opacity');
                     if (Number(op) === 0) {
-                      openCardInfo(img, info);
-                      activeCard = { img: img, info: info };
+                      openCardInfo(card, info);
+                      activeCard = { card: card, info: info };
                     } else {
-                      closeCardInfo(img, info);
+                      closeCardInfo(card, info);
                       activeCard = null;
                     }
                   });
@@ -384,7 +383,7 @@
                     end: 'top top',
                     onLeave: function () {
                       if (activeCard && activeCard.info === info) {
-                        closeCardInfo(activeCard.img, activeCard.info);
+                        closeCardInfo(activeCard.card, activeCard.info);
                         activeCard = null;
                       }
                     }
