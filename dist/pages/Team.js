@@ -262,24 +262,41 @@
               var activeCardInfo = null;
 
               teamCards.forEach(function (card) {
-                gsap.set(card, { opacity: 0 });
+                gsap.set(card, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
               });
 
               function openCardInfo(cardInfo) {
-                gsap.to(cardInfo, {
-                  opacity: 1,
-                  clipPath: 'inset(-5% -5% -5% -5%)',
-                  duration: 0.5,
-                  ease: 'power2.out'
-                });
+                // Make panel visible instantly, then overlay block reveal grid
+                gsap.set(cardInfo, { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)' });
+
+                if (window.BWBlockReveal && typeof window.BWBlockReveal.blockReveal === 'function') {
+                  // Ensure relative positioning for grid overlay
+                  if (getComputedStyle(cardInfo).position === 'static') {
+                    cardInfo.style.position = 'relative';
+                  }
+                  var handle = window.BWBlockReveal.blockReveal(cardInfo, {
+                    px: 28,
+                    holdMs: 120,
+                    baseStagger: 2,
+                    fadeMs: 60,
+                    burstEvery: 14,
+                    burstDelay: 8,
+                    clusterCount: 5,
+                    clusterRadius: 1,
+                    blinkMs: 40
+                  });
+                  if (handle) blockRevealHandles.push(handle);
+                }
               }
 
               function closeCardInfo(cardInfo) {
                 gsap.to(cardInfo, {
                   opacity: 0,
-                  clipPath: 'inset(100% 0% 0% 0%)',
-                  duration: 0.5,
-                  ease: 'power2.in'
+                  duration: 0.3,
+                  ease: 'power2.in',
+                  onComplete: function () {
+                    gsap.set(cardInfo, { clipPath: 'inset(100% 0% 0% 0%)' });
+                  }
                 });
               }
 
@@ -293,33 +310,14 @@
                   }
                 });
 
-                // Card fades in (no clip-path), then block reveal fires on the image
-                tl.to(card,
-                  { opacity: 1, duration: 0.4, ease: 'power2.out',
-                    onComplete: function () {
-                      // Fire block reveal AFTER card is visible
-                      if (window.BWBlockReveal && typeof window.BWBlockReveal.coverAndReveal === 'function') {
-                        var handle = window.BWBlockReveal.coverAndReveal({
-                          slideOrContainer: card,
-                          containerSelector: '[data-ts="img"]',
-                          imgSelector: '[data-ts="img"] img',
-                          holdMs: 180,
-                          baseStagger: 3,
-                          fadeMs: 80,
-                          burstEvery: 18,
-                          burstDelay: 10,
-                          clusterCount: 6,
-                          clusterRadius: 1,
-                          blinkMs: 45
-                        });
-                        if (handle) blockRevealHandles.push(handle);
-                      }
-                    }
-                  }
+                // Card scroll-in: clip-path reveal (original bw24 behavior)
+                tl.fromTo(card,
+                  { clipPath: 'inset(100% 0 0 0)', opacity: 0 },
+                  { clipPath: 'inset(0% 0 0 0)', opacity: 1, duration: 1, ease: 'power2.out' }
                 )
                   .to([teamInfos[index], teamSocials[index]],
                     { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' },
-                    '-=0.2'
+                    '-=0.5'
                   )
                   .add(function () {
                     var pos = teamInfos[index] ? teamInfos[index].querySelector('.card_info_position') : null;
