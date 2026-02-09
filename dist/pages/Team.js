@@ -103,14 +103,17 @@
                   backgroundImage: 'none',
                   backgroundColor: 'transparent'
                 });
-                // overflow:clip (Webflow default) prevents ALL scrolling in the
-                // subtree — unlike hidden it doesn't create a scroll container.
-                // Override to hidden auto on the panel + hidden on its parent
-                // (.card_top_wrap) so vertical scroll works inside the panel.
-                info.style.overflow = 'hidden auto';
-                info.style.maxHeight = '100%';
+                // Parent .card_top_wrap has overflow:clip which blocks ALL descendant
+                // scrolling. Switch to hidden so scroll containers inside work.
                 var topWrap = info.closest('.card_top_wrap');
                 if (topWrap) topWrap.style.overflow = 'hidden';
+                // The panel is display:flex — child stretches to container height so
+                // the panel itself never overflows. Put scroll on the text child.
+                var textChild = info.querySelector('.cms_item_text');
+                if (textChild) {
+                  textChild.style.overflowY = 'auto';
+                  textChild.style.maxHeight = '100%';
+                }
               });
 
               // Title split + reveal
@@ -276,8 +279,9 @@
               }
 
               // Team cards: reveal + info + click toggle of cardInfo
-              // activeCard tracks { img, info, card } for the currently open card
+              // activeCard tracks { img, info, card, handle, timer } for the currently open card
               var activeCard = null;
+              var animating = false;
 
               teamCards.forEach(function (card) {
                 gsap.set(card, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
@@ -409,6 +413,7 @@
               }
 
               function openCardInfo(imgEl, infoEl, card) {
+                animating = true;
                 var listItem = getListItem(card);
                 if (listItem) listItem.classList.add('active');
 
@@ -423,14 +428,15 @@
                 var imgHandle = fireBlockReveal(imgEl);
                 var coverDone = (imgHandle && imgHandle.coverPhaseDuration) || 0;
 
-                setTimeout(function () {
+                var timer = setTimeout(function () {
                   gsap.fromTo(infoEl,
                     { opacity: 0, clipPath: 'inset(100% 0% 0% 0%)' },
                     {
                       opacity: 1,
                       clipPath: 'inset(0% 0% 0% 0%)',
                       duration: 0.45,
-                      ease: 'power2.out'
+                      ease: 'power2.out',
+                      onComplete: function () { animating = false; }
                     }
                   );
 
@@ -439,10 +445,16 @@
                   });
                 }, coverDone);
 
-                return imgHandle;
+                return { handle: imgHandle, timer: timer };
               }
 
-              function closeCardInfo(imgEl, infoEl, card, handle) {
+              function closeCardInfo(imgEl, infoEl, card, handle, timer) {
+                // Cancel any pending open animation that hasn't fired yet
+                if (timer) clearTimeout(timer);
+
+                // Kill any running tweens on the info panel to prevent stale callbacks
+                gsap.killTweensOf(infoEl);
+
                 var listItem = getListItem(card);
                 if (listItem) listItem.classList.remove('active');
 
@@ -460,6 +472,7 @@
                       animated[i].textContent = animated[i].dataset.originalText;
                       delete animated[i].dataset.originalText;
                     }
+                    animating = false;
                   }
                 });
 
@@ -518,16 +531,18 @@
                 // Click toggle — block reveal fires on img (covers image area only)
                 if (img && info) {
                   on(img, 'click', function () {
+                    if (animating) return; // prevent rapid-click race
+
                     if (activeCard && activeCard.info !== info) {
-                      closeCardInfo(activeCard.img, activeCard.info, activeCard.card, activeCard.handle);
+                      closeCardInfo(activeCard.img, activeCard.info, activeCard.card, activeCard.handle, activeCard.timer);
                     }
 
                     var op = gsap.getProperty(info, 'opacity');
                     if (Number(op) === 0) {
-                      var handle = openCardInfo(img, info, card);
-                      activeCard = { img: img, info: info, card: card, handle: handle };
+                      var result = openCardInfo(img, info, card);
+                      activeCard = { img: img, info: info, card: card, handle: result.handle, timer: result.timer };
                     } else {
-                      closeCardInfo(img, info, card, activeCard ? activeCard.handle : null);
+                      closeCardInfo(img, info, card, activeCard ? activeCard.handle : null, activeCard ? activeCard.timer : null);
                       activeCard = null;
                     }
                   });
@@ -539,7 +554,7 @@
                     end: 'top top',
                     onLeave: function () {
                       if (activeCard && activeCard.info === info) {
-                        closeCardInfo(activeCard.img, activeCard.info, activeCard.card, activeCard.handle);
+                        closeCardInfo(activeCard.img, activeCard.info, activeCard.card, activeCard.handle, activeCard.timer);
                         activeCard = null;
                       }
                     }
