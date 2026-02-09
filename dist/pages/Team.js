@@ -301,7 +301,7 @@
                 if (listItem) listItem.classList.add('active');
 
                 // Cells stagger in over image and stay solid (coverOnly).
-                // Once covered, text slides up into view on the solid block surface.
+                // Once covered, panel slides up and text scrambles in.
                 var imgHandle = fireBlockReveal(imgEl);
                 var coverDone = (imgHandle && imgHandle.coverPhaseDuration) || 0;
 
@@ -315,6 +315,17 @@
                       ease: 'power2.out'
                     }
                   );
+
+                  // Text scramble — decode each text element inside the info panel
+                  if (window.decodeEffect) {
+                    var rand = window.randomCharacterDigital || window.randomCharacterTag;
+                    var textEls = qsa('.card_info_position', infoEl);
+                    textEls.forEach(function (el) {
+                      el.style.opacity = '1';
+                      el.style.visibility = 'visible';
+                      window.decodeEffect(el, rand, 900, false, 'forward', true);
+                    });
+                  }
                 }, coverDone);
 
                 return imgHandle;
@@ -331,6 +342,12 @@
                   ease: 'power2.in',
                   onComplete: function () {
                     gsap.set(infoEl, { clipPath: 'inset(100% 0 0 0)' });
+                    // Reset decoded text so it can scramble again on next open
+                    var textEls = qsa('.card_info_position', infoEl);
+                    textEls.forEach(function (el) {
+                      var orig = el.dataset.originalText;
+                      if (orig !== undefined) el.textContent = orig;
+                    });
                   }
                 });
 
