@@ -30,8 +30,10 @@ Page transitions must be seamless and never break navigation or layout -- users 
 
 - [ ] Fix nav/menu disappearing after internal Barba navigation
 - [ ] Integrate BWBlockReveal (bw-blockreveal.js) into global code, available via WFApp.global
-- [ ] Port Team page image animation parity from bw24 (gsap_team_new.js) using blockreveal for consistent UX
-- [ ] Ensure blockreveal re-runs/rebinds after Barba container swaps (tie into afterEnter / pageTransitionAfterReveal)
+- [ ] Port Team page image animation parity using blockreveal for consistent UX
+- [ ] Ensure blockreveal re-runs/rebinds after Barba container swaps
+- [ ] Port theme system (theme.js) -- toggle, localStorage persistence, OS preference fallback, logo variants
+- [ ] Full parity audit of Home, Portfolio, Contact, Insights controllers vs bw24 originals
 
 ### Out of Scope
 
@@ -40,6 +42,7 @@ Page transitions must be seamless and never break navigation or layout -- users 
 - Build system / bundler introduction -- current no-build CDN model is intentional
 - Server-side rendering or backend work -- frontend-only system
 - Lenis smooth scroll integration -- deferred
+- View Transitions API -- experimental, limited browser support
 
 ## Context
 
@@ -69,4 +72,4 @@ Page transitions must be seamless and never break navigation or layout -- users 
 | Team blockreveal uses same BWBlockReveal as global | Consistent UX, single implementation | -- Pending |
 
 ---
-*Last updated: 2026-02-08 after initialization*
+*Last updated: 2026-02-08 after roadmap creation*
