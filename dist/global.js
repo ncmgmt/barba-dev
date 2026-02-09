@@ -610,6 +610,10 @@
       var clusterRadius = (opts.clusterRadius !== undefined && opts.clusterRadius !== null) ? opts.clusterRadius : 1;
       var blinkMs = (opts.blinkMs !== undefined && opts.blinkMs !== null) ? opts.blinkMs : 45;
 
+      // coverMs > 0: cells start invisible and stagger IN before the hold+dissolve.
+      // Default 0 = legacy instant-cover behaviour.
+      var coverMs = (opts.coverMs !== undefined && opts.coverMs !== null) ? opts.coverMs : 0;
+
       var old = container.querySelector('.bw-blockreveal__grid');
       if (old) old.remove();
 
@@ -633,6 +637,7 @@
       for (var i = 0; i < total; i++) {
         var cell = document.createElement('div');
         cell.className = 'bw-blockreveal__cell';
+        if (coverMs > 0) cell.style.opacity = '0';
         cells[i] = cell;
         grid.appendChild(cell);
       }
@@ -649,6 +654,28 @@
       }
 
       var timers = [];
+
+      // --- Cover phase: staggered fade-in ---
+      var coverPhaseDuration = 0;
+      if (coverMs > 0) {
+        for (var k = 0; k < order.length; k++) {
+          var idx = order[k];
+          var cell = cells[idx];
+          var burst = burstEvery && k % burstEvery === 0 ? burstDelay : 0;
+          var delay = k * baseStagger + burst;
+
+          (function (cell) {
+            var tid = setTimeout(function () {
+              if (!cell) return;
+              cell.style.transition = 'opacity ' + coverMs + 'ms ease';
+              cell.style.opacity = '1';
+            }, delay);
+            timers.push(tid);
+          })(cell);
+        }
+        coverPhaseDuration = order.length * baseStagger +
+          Math.ceil(order.length / burstEvery) * burstDelay + coverMs;
+      }
 
       function idxToRC(idx) {
         return { r: Math.floor(idx / cols), c: idx % cols };
@@ -678,7 +705,8 @@
         return indices;
       }
 
-      var blinkStart = 40;
+      // --- Blink clusters (offset by cover phase) ---
+      var blinkStart = coverPhaseDuration + 40;
       var blinkWindow = Math.max(120, holdMs);
       for (var k = 0; k < clusterCount; k++) {
         var center = order[Math.floor(Math.random() * order.length)];
@@ -708,11 +736,12 @@
         })(cluster);
       }
 
+      // --- Dissolve phase: staggered fade-out (offset by cover phase) ---
       for (var k = 0; k < order.length; k++) {
         var idx = order[k];
         var cell = cells[idx];
         var burst = burstEvery && k % burstEvery === 0 ? burstDelay : 0;
-        var delay = holdMs + k * baseStagger + burst;
+        var delay = coverPhaseDuration + holdMs + k * baseStagger + burst;
 
         (function (cell) {
           var tid = setTimeout(function () {
@@ -724,7 +753,7 @@
         })(cell);
       }
 
-      var cleanupDelay = holdMs + order.length * baseStagger + Math.ceil(order.length / burstEvery) * burstDelay + fadeMs + 120;
+      var cleanupDelay = coverPhaseDuration + holdMs + order.length * baseStagger + Math.ceil(order.length / burstEvery) * burstDelay + fadeMs + 120;
       var cleanupTimer = setTimeout(function () {
         if (grid && grid.parentNode) grid.remove();
       }, cleanupDelay);
@@ -740,7 +769,8 @@
 
       var handle = {
         cleanup: cleanup,
-        timers: timers
+        timers: timers,
+        coverPhaseDuration: coverPhaseDuration
       };
 
       activeReveals.push(handle);

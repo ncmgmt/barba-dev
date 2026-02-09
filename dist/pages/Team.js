@@ -276,29 +276,29 @@
                 gsap.set(card, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
               });
 
-              // Block reveal on both image and info panel.
-              // On open: grid covers img + text materializes through dissolving cells.
-              // On close: grid covers img, info fades out.
+              // Block reveal with coverMs: cells stagger IN to cover image,
+              // blink/hold, then stagger OUT to reveal what's underneath.
               var blockRevealOpts = {
-                px: 28, holdMs: 200, baseStagger: 3, fadeMs: 90,
+                px: 28, coverMs: 70, holdMs: 200, baseStagger: 3, fadeMs: 90,
                 burstEvery: 14, burstDelay: 10, clusterCount: 6,
                 clusterRadius: 1, blinkMs: 50
               };
 
-              // Tighter grid for text — smaller cells, faster dissolve
+              // Tighter grid for text — smaller cells, snappier timing
               var infoRevealOpts = {
-                px: 20, holdMs: 120, baseStagger: 2, fadeMs: 70,
+                px: 20, coverMs: 50, holdMs: 120, baseStagger: 2, fadeMs: 70,
                 burstEvery: 10, burstDelay: 8, clusterCount: 4,
                 clusterRadius: 1, blinkMs: 40
               };
 
               function fireBlockReveal(el, opts) {
-                if (!window.BWBlockReveal || typeof window.BWBlockReveal.blockReveal !== 'function') return;
+                if (!window.BWBlockReveal || typeof window.BWBlockReveal.blockReveal !== 'function') return null;
                 if (getComputedStyle(el).position === 'static') {
                   el.style.position = 'relative';
                 }
                 var handle = window.BWBlockReveal.blockReveal(el, opts || blockRevealOpts);
                 if (handle) blockRevealHandles.push(handle);
+                return handle;
               }
 
               function getListItem(el) {
@@ -309,23 +309,25 @@
                 var listItem = getListItem(card);
                 if (listItem) listItem.classList.add('active');
 
-                fireBlockReveal(imgEl);
+                // Cells stagger in over image, then after cover phase completes
+                // show info + block-reveal the text content.
+                var imgHandle = fireBlockReveal(imgEl);
+                var coverDone = (imgHandle && imgHandle.coverPhaseDuration) || 0;
 
-                // Make info visible then block-reveal its content — cells dissolve to
-                // materialise the text, matching the site-wide reveal language.
                 setTimeout(function () {
                   gsap.set(infoEl, { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)' });
                   fireBlockReveal(infoEl, infoRevealOpts);
-                }, 80);
+                }, coverDone);
               }
 
               function closeCardInfo(imgEl, infoEl, card) {
                 var listItem = getListItem(card);
                 if (listItem) listItem.classList.remove('active');
 
-                // Reverse of open: cells cover text, then dissolve with the panel.
-                // After hold, panel fades + image block reveal fires to uncover grayscale.
-                fireBlockReveal(infoEl, infoRevealOpts);
+                // Reverse: cells cover text, panel fades during hold,
+                // then image cells cover + dissolve to uncover grayscale.
+                var infoHandle = fireBlockReveal(infoEl, infoRevealOpts);
+                var coverDone = (infoHandle && infoHandle.coverPhaseDuration) || 0;
 
                 setTimeout(function () {
                   gsap.to(infoEl, {
@@ -337,7 +339,7 @@
                     }
                   });
                   fireBlockReveal(imgEl);
-                }, 120);
+                }, coverDone);
               }
 
               teamCards.forEach(function (card, index) {
