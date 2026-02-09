@@ -296,8 +296,8 @@
                 try { return el.closest('.team_list_item'); } catch (_) { return null; }
               }
 
-              // FLIP-based shuffle→sort: words render in random order then
-              // smoothly glide into their correct positions.
+              // FLIP-based partial shuffle: a few random words start displaced
+              // and glide into their correct positions.
               function shuffleReveal(el) {
                 var text = el.textContent;
                 if (!text || !text.trim()) return;
@@ -305,7 +305,6 @@
 
                 var words = text.trim().split(/\s+/);
                 if (words.length < 2) {
-                  // Single word — simple fade
                   gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.4, ease: 'power2.out' });
                   return;
                 }
@@ -319,20 +318,31 @@
                   spans.push(span);
                 }
 
-                // Fisher-Yates shuffle (copy)
-                var shuffled = spans.slice();
-                for (var k = shuffled.length - 1; k > 0; k--) {
+                // Pick 2-4 random indices to displace (swap pairs)
+                var swapCount = Math.min(Math.max(2, Math.floor(words.length * 0.3)), 4);
+                if (swapCount % 2 !== 0) swapCount = Math.max(2, swapCount - 1);
+                var indices = [];
+                for (var i = 0; i < words.length; i++) indices.push(i);
+                // Fisher-Yates to pick random indices
+                for (var k = indices.length - 1; k > 0; k--) {
                   var j = Math.floor(Math.random() * (k + 1));
-                  var tmp = shuffled[k];
-                  shuffled[k] = shuffled[j];
-                  shuffled[j] = tmp;
+                  var tmp = indices[k]; indices[k] = indices[j]; indices[j] = tmp;
+                }
+                var displaced = indices.slice(0, swapCount);
+
+                // Build display order: swap displaced pairs
+                var displayOrder = spans.slice();
+                for (var i = 0; i < displaced.length - 1; i += 2) {
+                  var a = displaced[i], b = displaced[i + 1];
+                  displayOrder[a] = spans[b];
+                  displayOrder[b] = spans[a];
                 }
 
-                // Render shuffled order → measure FIRST positions
+                // Render displaced order → measure FIRST positions
                 el.innerHTML = '';
-                for (var i = 0; i < shuffled.length; i++) {
+                for (var i = 0; i < displayOrder.length; i++) {
                   if (i > 0) el.appendChild(document.createTextNode(' '));
-                  el.appendChild(shuffled[i]);
+                  el.appendChild(displayOrder[i]);
                 }
                 var first = spans.map(function (s) {
                   var r = s.getBoundingClientRect();
@@ -350,23 +360,33 @@
                   return { x: r.left, y: r.top };
                 });
 
-                // INVERT: offset each word so it visually sits at its shuffled position
+                // INVERT + PLAY: only displaced words animate position
+                var isDisplaced = {};
+                for (var i = 0; i < displaced.length; i++) isDisplaced[displaced[i]] = true;
+
                 for (var i = 0; i < spans.length; i++) {
-                  gsap.set(spans[i], {
-                    x: first[i].x - last[i].x,
-                    y: first[i].y - last[i].y,
-                    opacity: 0.35
-                  });
+                  if (isDisplaced[i]) {
+                    gsap.set(spans[i], {
+                      x: first[i].x - last[i].x,
+                      y: first[i].y - last[i].y,
+                      opacity: 0.35
+                    });
+                  } else {
+                    gsap.set(spans[i], { opacity: 0 });
+                  }
                 }
 
-                // PLAY: animate to correct positions
-                gsap.to(spans, {
-                  x: 0,
-                  y: 0,
-                  opacity: 1,
-                  duration: 0.6,
-                  stagger: 0.025,
-                  ease: 'power3.out'
+                // Non-displaced words fade in quickly
+                var statics = spans.filter(function (_, i) { return !isDisplaced[i]; });
+                gsap.to(statics, {
+                  opacity: 1, duration: 0.3, stagger: 0.02, ease: 'power2.out'
+                });
+
+                // Displaced words glide to correct position
+                var movers = displaced.map(function (i) { return spans[i]; });
+                gsap.to(movers, {
+                  x: 0, y: 0, opacity: 1,
+                  duration: 0.6, stagger: 0.04, ease: 'power3.out', delay: 0.1
                 });
               }
 
@@ -383,8 +403,14 @@
                 var listItem = getListItem(card);
                 if (listItem) listItem.classList.add('active');
 
+                // Trigger decode effect on the card's name element
+                if (window.hoverEffect) {
+                  var nameEl = card.querySelector('[data-hover-effect="true"]');
+                  if (nameEl) window.hoverEffect(nameEl);
+                }
+
                 // Cells stagger in over image and stay solid (coverOnly).
-                // Once covered, panel slides up and words fade in staggered.
+                // Once covered, panel slides up and shuffled words sort into place.
                 var imgHandle = fireBlockReveal(imgEl);
                 var coverDone = (imgHandle && imgHandle.coverPhaseDuration) || 0;
 
@@ -418,12 +444,13 @@
                   ease: 'power2.in',
                   onComplete: function () {
                     gsap.set(infoEl, { clipPath: 'inset(100% 0 0 0)' });
-                    // Restore original text for next open
-                    getLeafTextEls(infoEl).forEach(function (el) {
-                      if (el.dataset.originalText !== undefined) {
-                        el.textContent = el.dataset.originalText;
-                      }
-                    });
+                    // Restore original text (query by data attr, not leaf detection,
+                    // because shuffleReveal wraps text in <span> children).
+                    var animated = qsa('[data-original-text]', infoEl);
+                    for (var i = 0; i < animated.length; i++) {
+                      animated[i].textContent = animated[i].dataset.originalText;
+                      delete animated[i].dataset.originalText;
+                    }
                   }
                 });
 
