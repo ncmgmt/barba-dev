@@ -262,7 +262,7 @@
               var activeCardInfo = null;
 
               teamCards.forEach(function (card) {
-                gsap.set(card, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
+                gsap.set(card, { opacity: 0 });
               });
 
               function openCardInfo(cardInfo) {
@@ -289,15 +289,20 @@
                     trigger: card,
                     start: 'top 80%',
                     end: 'bottom 20%',
-                    toggleActions: 'play none none reverse',
-                    onEnter: function () {
-                      // Block reveal for card image (matches Home page team Swiper visual effect)
-                      // holdMs: 180 (10% faster than Home's 210ms for scroll-triggered vs user-initiated reveals)
+                    toggleActions: 'play none none reverse'
+                  }
+                });
+
+                // Card fades in (no clip-path), then block reveal fires on the image
+                tl.to(card,
+                  { opacity: 1, duration: 0.4, ease: 'power2.out',
+                    onComplete: function () {
+                      // Fire block reveal AFTER card is visible
                       if (window.BWBlockReveal && typeof window.BWBlockReveal.coverAndReveal === 'function') {
                         var handle = window.BWBlockReveal.coverAndReveal({
                           slideOrContainer: card,
-                          containerSelector: '.layout_team_visual_wrap',
-                          imgSelector: '.layout_team_visual_wrap > img.image',
+                          containerSelector: '[data-ts="img"]',
+                          imgSelector: '[data-ts="img"] img',
                           holdMs: 180,
                           baseStagger: 3,
                           fadeMs: 80,
@@ -311,15 +316,10 @@
                       }
                     }
                   }
-                });
-
-                tl.fromTo(card,
-                  { clipPath: 'inset(100% 0 0 0)', opacity: 0 },
-                  { clipPath: 'inset(0% 0 0 0)', opacity: 1, duration: 1, ease: 'power2.out' }
                 )
                   .to([teamInfos[index], teamSocials[index]],
                     { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' },
-                    '-=0.5'
+                    '-=0.2'
                   )
                   .add(function () {
                     var pos = teamInfos[index] ? teamInfos[index].querySelector('.card_info_position') : null;
