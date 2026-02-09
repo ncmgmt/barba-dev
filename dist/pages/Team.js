@@ -296,6 +296,43 @@
                 try { return el.closest('.team_list_item'); } catch (_) { return null; }
               }
 
+              // Lightweight scramble: all chars randomize simultaneously,
+              // resolved left-to-right over a fixed duration. No extra plugin.
+              var scrambleChars = '01ABCDEFHKMNPRSTUVWXYZ';
+              function scrambleIn(el, dur) {
+                var original = el.textContent;
+                if (!original || !original.trim()) return;
+                el.dataset.originalText = original;
+                var len = original.length;
+
+                gsap.fromTo({ p: 0 }, { p: 0 }, {
+                  p: 1,
+                  duration: dur || 0.6,
+                  ease: 'none',
+                  onUpdate: function () {
+                    var p = this.targets()[0].p;
+                    var done = Math.floor(p * len);
+                    var out = '';
+                    for (var i = 0; i < len; i++) {
+                      if (original[i] === ' ') { out += ' '; }
+                      else if (i < done) { out += original[i]; }
+                      else { out += scrambleChars[Math.floor(Math.random() * scrambleChars.length)]; }
+                    }
+                    el.textContent = out;
+                  },
+                  onComplete: function () { el.textContent = original; }
+                });
+              }
+
+              function getLeafTextEls(root) {
+                var all = Array.prototype.slice.call(root.querySelectorAll('*'));
+                return all.filter(function (el) {
+                  var tag = el.tagName;
+                  if (tag === 'STYLE' || tag === 'SCRIPT' || tag === 'SVG' || tag === 'IMG') return false;
+                  return el.children.length === 0 && el.textContent && el.textContent.trim();
+                });
+              }
+
               function openCardInfo(imgEl, infoEl, card) {
                 var listItem = getListItem(card);
                 if (listItem) listItem.classList.add('active');
@@ -316,19 +353,9 @@
                     }
                   );
 
-                  // Text scramble — decode every leaf text element in the info panel.
-                  // Targets any element with text and no child elements (actual labels).
-                  if (window.decodeEffect) {
-                    var rand = window.randomCharacterDigital || window.randomCharacterTag;
-                    var allEls = Array.prototype.slice.call(infoEl.querySelectorAll('*'));
-                    allEls.forEach(function (el) {
-                      var tag = el.tagName;
-                      if (tag === 'STYLE' || tag === 'SCRIPT' || tag === 'SVG' || tag === 'IMG') return;
-                      if (el.children.length > 0) return;
-                      if (!el.textContent || !el.textContent.trim()) return;
-                      window.decodeEffect(el, rand, 900, false, 'forward', true);
-                    });
-                  }
+                  getLeafTextEls(infoEl).forEach(function (el) {
+                    scrambleIn(el, 0.6);
+                  });
                 }, coverDone);
 
                 return imgHandle;
@@ -345,9 +372,8 @@
                   ease: 'power2.in',
                   onComplete: function () {
                     gsap.set(infoEl, { clipPath: 'inset(100% 0 0 0)' });
-                    // Reset decoded text so it can scramble again on next open
-                    var allEls = Array.prototype.slice.call(infoEl.querySelectorAll('*'));
-                    allEls.forEach(function (el) {
+                    // Reset text for next open
+                    getLeafTextEls(infoEl).forEach(function (el) {
                       if (el.dataset.originalText !== undefined) {
                         el.textContent = el.dataset.originalText;
                       }
