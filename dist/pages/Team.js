@@ -266,26 +266,52 @@
               });
 
               function openCardInfo(cardInfo) {
-                // Make panel visible instantly, then overlay block reveal grid
-                gsap.set(cardInfo, { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)' });
+                // 1. Show panel container (fully clipped open) but keep content invisible
+                gsap.set(cardInfo, { clipPath: 'inset(0% 0% 0% 0%)', visibility: 'visible' });
+
+                // 2. Hide all direct children (the text content) initially
+                var children = Array.prototype.slice.call(cardInfo.children);
+                children.forEach(function (ch) {
+                  if (!ch.classList.contains('bw-blockreveal__grid')) {
+                    gsap.set(ch, { opacity: 0 });
+                  }
+                });
+
+                // 3. Set panel opacity to 1 so the grid overlay is visible
+                gsap.set(cardInfo, { opacity: 1 });
 
                 if (window.BWBlockReveal && typeof window.BWBlockReveal.blockReveal === 'function') {
-                  // Ensure relative positioning for grid overlay
                   if (getComputedStyle(cardInfo).position === 'static') {
                     cardInfo.style.position = 'relative';
                   }
+
+                  // 4. Grid overlay appears solid, flickers, then fades away
                   var handle = window.BWBlockReveal.blockReveal(cardInfo, {
                     px: 28,
-                    holdMs: 120,
-                    baseStagger: 2,
-                    fadeMs: 60,
+                    holdMs: 200,
+                    baseStagger: 3,
+                    fadeMs: 70,
                     burstEvery: 14,
-                    burstDelay: 8,
-                    clusterCount: 5,
+                    burstDelay: 10,
+                    clusterCount: 6,
                     clusterRadius: 1,
-                    blinkMs: 40
+                    blinkMs: 45
                   });
                   if (handle) blockRevealHandles.push(handle);
+
+                  // 5. Fade in text content as the grid starts dissolving
+                  var revealDelay = 200 + 60; // holdMs + small offset so text appears mid-dissolve
+                  gsap.to(children, {
+                    opacity: 1,
+                    duration: 0.4,
+                    ease: 'power2.out',
+                    delay: revealDelay / 1000,
+                    stagger: 0.05
+                  });
+                } else {
+                  // Fallback: just fade in if BWBlockReveal unavailable
+                  gsap.to(cardInfo, { opacity: 1, duration: 0.4, ease: 'power2.out' });
+                  children.forEach(function (ch) { gsap.set(ch, { opacity: 1 }); });
                 }
               }
 
@@ -295,7 +321,14 @@
                   duration: 0.3,
                   ease: 'power2.in',
                   onComplete: function () {
-                    gsap.set(cardInfo, { clipPath: 'inset(100% 0% 0% 0%)' });
+                    gsap.set(cardInfo, { clipPath: 'inset(100% 0% 0% 0%)', visibility: 'hidden' });
+                    // Reset children opacity for next open
+                    var children = Array.prototype.slice.call(cardInfo.children);
+                    children.forEach(function (ch) {
+                      if (!ch.classList.contains('bw-blockreveal__grid')) {
+                        gsap.set(ch, { opacity: 1 });
+                      }
+                    });
                   }
                 });
               }
