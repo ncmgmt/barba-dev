@@ -259,36 +259,27 @@
               }
 
               // Team cards: reveal + info + click toggle of cardInfo
-              var activeCardInfo = null;
+              // activeCard tracks { img, info } for the currently open card
+              var activeCard = null;
 
               teamCards.forEach(function (card) {
                 gsap.set(card, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
               });
 
-              function openCardInfo(cardInfo) {
-                // 1. Show panel container (fully clipped open) but keep content invisible
-                gsap.set(cardInfo, { clipPath: 'inset(0% 0% 0% 0%)', visibility: 'visible' });
-
-                // 2. Hide all direct children (the text content) initially
-                var children = Array.prototype.slice.call(cardInfo.children);
-                children.forEach(function (ch) {
-                  if (!ch.classList.contains('bw-blockreveal__grid')) {
-                    gsap.set(ch, { opacity: 0 });
-                  }
-                });
-
-                // 3. Set panel opacity to 1 so the grid overlay is visible
-                gsap.set(cardInfo, { opacity: 1 });
-
+              // openCardInfo: imgEl = [data-ts="img"], infoEl = [data-ts="info"]
+              // Block reveal grid covers the IMAGE, info panel fades in behind grid,
+              // grid dissolves to reveal the text.
+              function openCardInfo(imgEl, infoEl) {
                 if (window.BWBlockReveal && typeof window.BWBlockReveal.blockReveal === 'function') {
-                  if (getComputedStyle(cardInfo).position === 'static') {
-                    cardInfo.style.position = 'relative';
+                  // Ensure image wrapper can hold the grid overlay
+                  if (getComputedStyle(imgEl).position === 'static') {
+                    imgEl.style.position = 'relative';
                   }
 
-                  // 4. Grid overlay appears solid, flickers, then fades away
-                  var handle = window.BWBlockReveal.blockReveal(cardInfo, {
+                  // 1. Block reveal grid covers the image (solid, opaque)
+                  var handle = window.BWBlockReveal.blockReveal(imgEl, {
                     px: 28,
-                    holdMs: 200,
+                    holdMs: 250,
                     baseStagger: 3,
                     fadeMs: 70,
                     burstEvery: 14,
@@ -299,36 +290,32 @@
                   });
                   if (handle) blockRevealHandles.push(handle);
 
-                  // 5. Fade in text content as the grid starts dissolving
-                  var revealDelay = 200 + 60; // holdMs + small offset so text appears mid-dissolve
-                  gsap.to(children, {
-                    opacity: 1,
-                    duration: 0.4,
-                    ease: 'power2.out',
-                    delay: revealDelay / 1000,
-                    stagger: 0.05
-                  });
+                  // 2. While grid is still solid (after short delay), show info panel underneath
+                  setTimeout(function () {
+                    gsap.set(infoEl, { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)' });
+                  }, 100);
                 } else {
-                  // Fallback: just fade in if BWBlockReveal unavailable
-                  gsap.to(cardInfo, { opacity: 1, duration: 0.4, ease: 'power2.out' });
-                  children.forEach(function (ch) { gsap.set(ch, { opacity: 1 }); });
+                  // Fallback without block reveal
+                  gsap.to(infoEl, {
+                    opacity: 1,
+                    clipPath: 'inset(-5% -5% -5% -5%)',
+                    duration: 0.5,
+                    ease: 'power2.out'
+                  });
                 }
               }
 
-              function closeCardInfo(cardInfo) {
-                gsap.to(cardInfo, {
+              function closeCardInfo(imgEl, infoEl) {
+                // Clean up any leftover block reveal grid on the image
+                var oldGrid = imgEl.querySelector('.bw-blockreveal__grid');
+                if (oldGrid) oldGrid.remove();
+
+                gsap.to(infoEl, {
                   opacity: 0,
                   duration: 0.3,
                   ease: 'power2.in',
                   onComplete: function () {
-                    gsap.set(cardInfo, { clipPath: 'inset(100% 0% 0% 0%)', visibility: 'hidden' });
-                    // Reset children opacity for next open
-                    var children = Array.prototype.slice.call(cardInfo.children);
-                    children.forEach(function (ch) {
-                      if (!ch.classList.contains('bw-blockreveal__grid')) {
-                        gsap.set(ch, { opacity: 1 });
-                      }
-                    });
+                    gsap.set(infoEl, { clipPath: 'inset(100% 0% 0% 0%)' });
                   }
                 });
               }
@@ -376,17 +363,17 @@
                 var info = teamCardInfos[index];
                 if (img && info) {
                   on(img, 'click', function () {
-                    if (activeCardInfo && activeCardInfo !== info) {
-                      closeCardInfo(activeCardInfo);
+                    if (activeCard && activeCard.info !== info) {
+                      closeCardInfo(activeCard.img, activeCard.info);
                     }
 
                     var op = gsap.getProperty(info, 'opacity');
                     if (Number(op) === 0) {
-                      openCardInfo(info);
-                      activeCardInfo = info;
+                      openCardInfo(img, info);
+                      activeCard = { img: img, info: info };
                     } else {
-                      closeCardInfo(info);
-                      activeCardInfo = null;
+                      closeCardInfo(img, info);
+                      activeCard = null;
                     }
                   });
 
@@ -396,9 +383,9 @@
                     start: 'bottom bottom',
                     end: 'top top',
                     onLeave: function () {
-                      if (activeCardInfo === info) {
-                        closeCardInfo(info);
-                        activeCardInfo = null;
+                      if (activeCard && activeCard.info === info) {
+                        closeCardInfo(activeCard.img, activeCard.info);
+                        activeCard = null;
                       }
                     }
                   }));
