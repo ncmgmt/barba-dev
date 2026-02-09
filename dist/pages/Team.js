@@ -296,32 +296,40 @@
                 try { return el.closest('.team_list_item'); } catch (_) { return null; }
               }
 
-              // Lightweight scramble: all chars randomize simultaneously,
-              // resolved left-to-right over a fixed duration. No extra plugin.
-              var scrambleChars = '01ABCDEFHKMNPRSTUVWXYZ';
-              function scrambleIn(el, dur) {
-                var original = el.textContent;
-                if (!original || !original.trim()) return;
-                el.dataset.originalText = original;
-                var len = original.length;
+              // Split text into words, stagger each word in with subtle
+              // upward motion + fade. Elegant, premium feel.
+              function revealWords(el) {
+                var text = el.textContent;
+                if (!text || !text.trim()) return;
+                el.dataset.originalText = text;
 
-                gsap.fromTo({ p: 0 }, { p: 0 }, {
-                  p: 1,
-                  duration: dur || 0.6,
-                  ease: 'none',
-                  onUpdate: function () {
-                    var p = this.targets()[0].p;
-                    var done = Math.floor(p * len);
-                    var out = '';
-                    for (var i = 0; i < len; i++) {
-                      if (original[i] === ' ') { out += ' '; }
-                      else if (i < done) { out += original[i]; }
-                      else { out += scrambleChars[Math.floor(Math.random() * scrambleChars.length)]; }
-                    }
-                    el.textContent = out;
-                  },
-                  onComplete: function () { el.textContent = original; }
-                });
+                var parts = text.split(/(\s+)/);
+                el.innerHTML = '';
+                var wordSpans = [];
+
+                for (var i = 0; i < parts.length; i++) {
+                  if (!parts[i].trim()) {
+                    el.appendChild(document.createTextNode(parts[i]));
+                  } else {
+                    var span = document.createElement('span');
+                    span.style.display = 'inline-block';
+                    span.textContent = parts[i];
+                    el.appendChild(span);
+                    wordSpans.push(span);
+                  }
+                }
+
+                gsap.fromTo(wordSpans,
+                  { opacity: 0, y: 10, filter: 'blur(4px)' },
+                  {
+                    opacity: 1,
+                    y: 0,
+                    filter: 'blur(0px)',
+                    duration: 0.35,
+                    stagger: 0.035,
+                    ease: 'power2.out'
+                  }
+                );
               }
 
               function getLeafTextEls(root) {
@@ -338,7 +346,7 @@
                 if (listItem) listItem.classList.add('active');
 
                 // Cells stagger in over image and stay solid (coverOnly).
-                // Once covered, panel slides up and text scrambles in.
+                // Once covered, panel slides up and words fade in staggered.
                 var imgHandle = fireBlockReveal(imgEl);
                 var coverDone = (imgHandle && imgHandle.coverPhaseDuration) || 0;
 
@@ -354,7 +362,7 @@
                   );
 
                   getLeafTextEls(infoEl).forEach(function (el) {
-                    scrambleIn(el, 0.6);
+                    revealWords(el);
                   });
                 }, coverDone);
 
@@ -372,7 +380,7 @@
                   ease: 'power2.in',
                   onComplete: function () {
                     gsap.set(infoEl, { clipPath: 'inset(100% 0 0 0)' });
-                    // Reset text for next open
+                    // Restore original text for next open
                     getLeafTextEls(infoEl).forEach(function (el) {
                       if (el.dataset.originalText !== undefined) {
                         el.textContent = el.dataset.originalText;
