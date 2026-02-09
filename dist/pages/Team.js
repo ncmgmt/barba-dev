@@ -101,7 +101,8 @@
               teamCardInfos.forEach(function (info) {
                 gsap.set(info, {
                   backgroundImage: 'none',
-                  backgroundColor: 'transparent'
+                  backgroundColor: 'transparent',
+                  pointerEvents: 'auto'
                 });
                 // Parent .card_top_wrap has overflow:clip which blocks ALL descendant
                 // scrolling. Switch to hidden so scroll containers inside work.
@@ -531,7 +532,7 @@
                 // Click toggle — block reveal fires on img (covers image area only)
                 if (img && info) {
                   on(img, 'click', function () {
-                    if (animating) return; // prevent rapid-click race
+                    if (animating) return;
 
                     if (activeCard && activeCard.info !== info) {
                       closeCardInfo(activeCard.img, activeCard.info, activeCard.card, activeCard.handle, activeCard.timer);
@@ -543,6 +544,15 @@
                       activeCard = { img: img, info: info, card: card, handle: result.handle, timer: result.timer };
                     } else {
                       closeCardInfo(img, info, card, activeCard ? activeCard.handle : null, activeCard ? activeCard.timer : null);
+                      activeCard = null;
+                    }
+                  });
+
+                  // Click on open info panel → close
+                  on(info, 'click', function () {
+                    if (animating) return;
+                    if (activeCard && activeCard.info === info) {
+                      closeCardInfo(activeCard.img, activeCard.info, activeCard.card, activeCard.handle, activeCard.timer);
                       activeCard = null;
                     }
                   });
