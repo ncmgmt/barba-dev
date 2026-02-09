@@ -101,10 +101,12 @@
               teamCardInfos.forEach(function (info) {
                 gsap.set(info, {
                   backgroundImage: 'none',
-                  backgroundColor: 'transparent',
-                  overflowY: 'auto',
-                  maxHeight: '100%'
+                  backgroundColor: 'transparent'
                 });
+                // Webflow sets overflow:clip which blocks scroll entirely.
+                // Override both axes (clip can't mix with auto on opposite axis).
+                info.style.overflow = 'hidden auto';
+                info.style.maxHeight = '100%';
               });
 
               // Title split + reveal
