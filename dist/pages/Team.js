@@ -296,40 +296,78 @@
                 try { return el.closest('.team_list_item'); } catch (_) { return null; }
               }
 
-              // Split text into words, stagger each word in with subtle
-              // upward motion + fade. Elegant, premium feel.
-              function revealWords(el) {
+              // FLIP-based shuffle→sort: words render in random order then
+              // smoothly glide into their correct positions.
+              function shuffleReveal(el) {
                 var text = el.textContent;
                 if (!text || !text.trim()) return;
                 el.dataset.originalText = text;
 
-                var parts = text.split(/(\s+)/);
-                el.innerHTML = '';
-                var wordSpans = [];
-
-                for (var i = 0; i < parts.length; i++) {
-                  if (!parts[i].trim()) {
-                    el.appendChild(document.createTextNode(parts[i]));
-                  } else {
-                    var span = document.createElement('span');
-                    span.style.display = 'inline-block';
-                    span.textContent = parts[i];
-                    el.appendChild(span);
-                    wordSpans.push(span);
-                  }
+                var words = text.trim().split(/\s+/);
+                if (words.length < 2) {
+                  // Single word — simple fade
+                  gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.4, ease: 'power2.out' });
+                  return;
                 }
 
-                gsap.fromTo(wordSpans,
-                  { opacity: 0, y: 10, filter: 'blur(4px)' },
-                  {
-                    opacity: 1,
-                    y: 0,
-                    filter: 'blur(0px)',
-                    duration: 0.35,
-                    stagger: 0.035,
-                    ease: 'power2.out'
-                  }
-                );
+                // Build word spans (correct order)
+                var spans = [];
+                for (var i = 0; i < words.length; i++) {
+                  var span = document.createElement('span');
+                  span.style.display = 'inline-block';
+                  span.textContent = words[i];
+                  spans.push(span);
+                }
+
+                // Fisher-Yates shuffle (copy)
+                var shuffled = spans.slice();
+                for (var k = shuffled.length - 1; k > 0; k--) {
+                  var j = Math.floor(Math.random() * (k + 1));
+                  var tmp = shuffled[k];
+                  shuffled[k] = shuffled[j];
+                  shuffled[j] = tmp;
+                }
+
+                // Render shuffled order → measure FIRST positions
+                el.innerHTML = '';
+                for (var i = 0; i < shuffled.length; i++) {
+                  if (i > 0) el.appendChild(document.createTextNode(' '));
+                  el.appendChild(shuffled[i]);
+                }
+                var first = spans.map(function (s) {
+                  var r = s.getBoundingClientRect();
+                  return { x: r.left, y: r.top };
+                });
+
+                // Reorder to correct order → measure LAST positions
+                el.innerHTML = '';
+                for (var i = 0; i < spans.length; i++) {
+                  if (i > 0) el.appendChild(document.createTextNode(' '));
+                  el.appendChild(spans[i]);
+                }
+                var last = spans.map(function (s) {
+                  var r = s.getBoundingClientRect();
+                  return { x: r.left, y: r.top };
+                });
+
+                // INVERT: offset each word so it visually sits at its shuffled position
+                for (var i = 0; i < spans.length; i++) {
+                  gsap.set(spans[i], {
+                    x: first[i].x - last[i].x,
+                    y: first[i].y - last[i].y,
+                    opacity: 0.35
+                  });
+                }
+
+                // PLAY: animate to correct positions
+                gsap.to(spans, {
+                  x: 0,
+                  y: 0,
+                  opacity: 1,
+                  duration: 0.6,
+                  stagger: 0.025,
+                  ease: 'power3.out'
+                });
               }
 
               function getLeafTextEls(root) {
@@ -362,7 +400,7 @@
                   );
 
                   getLeafTextEls(infoEl).forEach(function (el) {
-                    revealWords(el);
+                    shuffleReveal(el);
                   });
                 }, coverDone);
 
