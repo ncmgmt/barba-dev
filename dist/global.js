@@ -710,34 +710,37 @@
       }
 
       // --- Blink clusters (offset by cover phase) ---
-      var blinkStart = coverPhaseDuration + 40;
-      var blinkWindow = Math.max(120, holdMs);
-      for (var k = 0; k < clusterCount; k++) {
-        var center = order[Math.floor(Math.random() * order.length)];
-        var cluster = getClusterIndices(center);
-        var t = blinkStart + Math.random() * blinkWindow;
+      // Skip blinks in coverOnly mode — cells serve as a solid text background.
+      if (!coverOnly) {
+        var blinkStart = coverPhaseDuration + 40;
+        var blinkWindow = Math.max(120, holdMs);
+        for (var k = 0; k < clusterCount; k++) {
+          var center = order[Math.floor(Math.random() * order.length)];
+          var cluster = getClusterIndices(center);
+          var t = blinkStart + Math.random() * blinkWindow;
 
-        (function (cluster) {
-          var tid = setTimeout(function () {
-            for (var i = 0; i < cluster.length; i++) {
-              var idx = cluster[i];
-              var cell = cells[idx];
-              if (!cell || cell.style.opacity === '0') continue;
+          (function (cluster) {
+            var tid = setTimeout(function () {
+              for (var i = 0; i < cluster.length; i++) {
+                var idx = cluster[i];
+                var cell = cells[idx];
+                if (!cell || cell.style.opacity === '0') continue;
 
-              cell.style.transition = 'opacity ' + blinkMs + 'ms linear';
-              cell.style.opacity = '0.25';
+                cell.style.transition = 'opacity ' + blinkMs + 'ms linear';
+                cell.style.opacity = '0.25';
 
-              (function (cell) {
-                var tid2 = setTimeout(function () {
-                  if (!cell || cell.style.opacity === '0') return;
-                  cell.style.opacity = '1';
-                }, blinkMs);
-                timers.push(tid2);
-              })(cell);
-            }
-          }, t);
-          timers.push(tid);
-        })(cluster);
+                (function (cell) {
+                  var tid2 = setTimeout(function () {
+                    if (!cell || cell.style.opacity === '0') return;
+                    cell.style.opacity = '1';
+                  }, blinkMs);
+                  timers.push(tid2);
+                })(cell);
+              }
+            }, t);
+            timers.push(tid);
+          })(cluster);
+        }
       }
 
       // --- Dissolve phase: staggered fade-out (offset by cover phase) ---

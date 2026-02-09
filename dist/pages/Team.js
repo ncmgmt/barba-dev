@@ -301,12 +301,20 @@
                 if (listItem) listItem.classList.add('active');
 
                 // Cells stagger in over image and stay solid (coverOnly).
-                // Once covered, show text on top of the solid block surface.
+                // Once covered, text slides up into view on the solid block surface.
                 var imgHandle = fireBlockReveal(imgEl);
                 var coverDone = (imgHandle && imgHandle.coverPhaseDuration) || 0;
 
                 setTimeout(function () {
-                  gsap.set(infoEl, { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)' });
+                  gsap.fromTo(infoEl,
+                    { opacity: 0, clipPath: 'inset(100% 0% 0% 0%)' },
+                    {
+                      opacity: 1,
+                      clipPath: 'inset(0% 0% 0% 0%)',
+                      duration: 0.45,
+                      ease: 'power2.out'
+                    }
+                  );
                 }, coverDone);
 
                 return imgHandle;
