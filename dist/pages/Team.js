@@ -8,7 +8,6 @@
     init: function ({ container }) {
       var ctx = null;
       var mm = null;
-      var mmBg = null;
       var splitInstances = [];
       var listeners = [];
       var st = [];
@@ -95,6 +94,17 @@
               gsap.set([teamInfos, teamSocials], { opacity: 0, y: 30 });
               gsap.set(teamCardInfos, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
               gsap.set(cardInfoPositions, { opacity: 0 });
+
+              // Glassmorphism — semi-transparent bg lets block reveal cells show through.
+              // color-mix auto-adapts to light/dark theme via --theme--card-bg variable.
+              teamCardInfos.forEach(function (info) {
+                gsap.set(info, {
+                  backgroundImage: 'none',
+                  backgroundColor: 'color-mix(in srgb, var(--theme--card-bg) 65%, transparent)',
+                  backdropFilter: 'blur(12px) saturate(1.2)',
+                  webkitBackdropFilter: 'blur(12px) saturate(1.2)'
+                });
+              });
 
               // Title split + reveal
               if (teamTitle) {
@@ -259,49 +269,75 @@
               }
 
               // Team cards: reveal + info + click toggle of cardInfo
-              // activeCard tracks { img, info } for the currently open card
+              // activeCard tracks { img, info, card } for the currently open card
               var activeCard = null;
 
               teamCards.forEach(function (card) {
                 gsap.set(card, { opacity: 0, clipPath: 'inset(100% 0 0 0)' });
               });
 
-              // Block reveal on IMAGE wrapper only — grid covers the image area.
-              // On open: grid covers img, info panel fades in on top as cells fade out.
-              // On close: grid covers img, info hidden while cells are solid, cells fade to show image.
+              // Block reveal on both image and info panel.
+              // On open: grid covers img + text materializes through dissolving cells.
+              // On close: grid covers img, info fades out.
               var blockRevealOpts = {
-                px: 28, holdMs: 200, baseStagger: 3, fadeMs: 70,
+                px: 28, holdMs: 200, baseStagger: 3, fadeMs: 90,
                 burstEvery: 14, burstDelay: 10, clusterCount: 6,
-                clusterRadius: 1, blinkMs: 45
+                clusterRadius: 1, blinkMs: 50
               };
 
-              function fireBlockReveal(el) {
+              // Tighter grid for text — smaller cells, faster dissolve
+              var infoRevealOpts = {
+                px: 20, holdMs: 120, baseStagger: 2, fadeMs: 70,
+                burstEvery: 10, burstDelay: 8, clusterCount: 4,
+                clusterRadius: 1, blinkMs: 40
+              };
+
+              function fireBlockReveal(el, opts) {
                 if (!window.BWBlockReveal || typeof window.BWBlockReveal.blockReveal !== 'function') return;
                 if (getComputedStyle(el).position === 'static') {
                   el.style.position = 'relative';
                 }
-                var handle = window.BWBlockReveal.blockReveal(el, blockRevealOpts);
+                var handle = window.BWBlockReveal.blockReveal(el, opts || blockRevealOpts);
                 if (handle) blockRevealHandles.push(handle);
               }
 
-              function openCardInfo(imgEl, infoEl) {
-                fireBlockReveal(imgEl);
-                // Show info after grid has flickered briefly
-                gsap.set(infoEl, { clipPath: 'inset(0% 0% 0% 0%)' });
-                setTimeout(function () {
-                  gsap.to(infoEl, { opacity: 1, duration: 0.18, ease: 'power1.out' });
-                }, 150);
+              function getListItem(el) {
+                try { return el.closest('.team_list_item'); } catch (_) { return null; }
               }
 
-              function closeCardInfo(imgEl, infoEl) {
-                var oldGrid = imgEl.querySelector('.bw-blockreveal__grid');
-                if (oldGrid) oldGrid.remove();
+              function openCardInfo(imgEl, infoEl, card) {
+                var listItem = getListItem(card);
+                if (listItem) listItem.classList.add('active');
 
                 fireBlockReveal(imgEl);
-                // Hide info while grid is solid
+
+                // Make info visible then block-reveal its content — cells dissolve to
+                // materialise the text, matching the site-wide reveal language.
                 setTimeout(function () {
-                  gsap.set(infoEl, { opacity: 0 });
+                  gsap.set(infoEl, { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)' });
+                  fireBlockReveal(infoEl, infoRevealOpts);
                 }, 80);
+              }
+
+              function closeCardInfo(imgEl, infoEl, card) {
+                var listItem = getListItem(card);
+                if (listItem) listItem.classList.remove('active');
+
+                var oldImgGrid = imgEl.querySelector('.bw-blockreveal__grid');
+                if (oldImgGrid) oldImgGrid.remove();
+                var oldInfoGrid = infoEl.querySelector('.bw-blockreveal__grid');
+                if (oldInfoGrid) oldInfoGrid.remove();
+
+                fireBlockReveal(imgEl);
+
+                gsap.to(infoEl, {
+                  opacity: 0,
+                  duration: 0.25,
+                  ease: 'power2.in',
+                  onComplete: function () {
+                    gsap.set(infoEl, { clipPath: 'inset(100% 0 0 0)' });
+                  }
+                });
               }
 
               teamCards.forEach(function (card, index) {
@@ -347,15 +383,15 @@
                 if (img && info) {
                   on(img, 'click', function () {
                     if (activeCard && activeCard.info !== info) {
-                      closeCardInfo(activeCard.img, activeCard.info);
+                      closeCardInfo(activeCard.img, activeCard.info, activeCard.card);
                     }
 
                     var op = gsap.getProperty(info, 'opacity');
                     if (Number(op) === 0) {
-                      openCardInfo(img, info);
-                      activeCard = { img: img, info: info };
+                      openCardInfo(img, info, card);
+                      activeCard = { img: img, info: info, card: card };
                     } else {
-                      closeCardInfo(img, info);
+                      closeCardInfo(img, info, card);
                       activeCard = null;
                     }
                   });
@@ -367,30 +403,12 @@
                     end: 'top top',
                     onLeave: function () {
                       if (activeCard && activeCard.info === info) {
-                        closeCardInfo(activeCard.img, activeCard.info);
+                        closeCardInfo(activeCard.img, activeCard.info, activeCard.card);
                         activeCard = null;
                       }
                     }
                   }));
                 }
-              });
-
-              // Background gradient differences
-              mmBg = gsap.matchMedia();
-              mmBg.add('(max-width: 1440px)', function () {
-                teamCardInfos.forEach(function (info) {
-                  gsap.set(info, {
-                    backgroundImage: 'linear-gradient(180deg, #ffffffbf, var(--theme--card-bg) 90%)'
-                  });
-                });
-              });
-
-              mmBg.add('(min-width: 1441px)', function () {
-                teamCardInfos.forEach(function (info) {
-                  gsap.set(info, {
-                    backgroundImage: 'linear-gradient(180deg, var(--theme--card-bg), var(--theme--card-bg) 90%)'
-                  });
-                });
               });
 
               // Resize behavior: keep decoded labels visible
@@ -439,11 +457,6 @@
           });
           blockRevealHandles = [];
 
-          if (mmBg) {
-            try { mmBg.kill(); } catch (_) {}
-            mmBg = null;
-          }
-
           if (mm) {
             try { mm.kill(); } catch (_) {}
             mm = null;
@@ -451,6 +464,11 @@
 
           st.forEach(function (t) { try { t.kill(); } catch (_) {} });
           st = [];
+
+          try {
+            var activeItems = container.querySelectorAll('.team_list_item.active');
+            for (var i = 0; i < activeItems.length; i++) activeItems[i].classList.remove('active');
+          } catch (_) {}
 
           if (ctx) {
             try { ctx.revert(); } catch (_) {}
