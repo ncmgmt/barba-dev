@@ -46,10 +46,10 @@ Plans:
   3. Block reveal re-runs correctly after navigating to page, leaving, and returning (rebinds via Barba hooks)
   4. Navigating away during block reveal animation cancels cleanly with no orphaned DOM elements or timers
   5. Window.BWBlockReveal exists for backward compatibility with existing Home.js calls
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] (Plans will be added during planning phase)
+- [ ] 02-01-PLAN.md — Implement BWBlockReveal utility in global.js with Barba lifecycle cleanup and human verification
 
 ### Phase 3: Team Page Parity
 **Goal**: Team page card animations and click-to-expand panels match bw24 behavior using Block Reveal animation (BWBlockReveal.coverAndReveal) for image reveals to achieve consistent UI/UX across the site
@@ -104,8 +104,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Nav Persistence | 0/2 | Planned | - |
-| 2. Block Reveal | 0/TBD | Not started | - |
+| 1. Nav Persistence | 2/2 | Complete | 2026-02-09 |
+| 2. Block Reveal | 0/1 | Planned | - |
 | 3. Team Page Parity | 0/TBD | Not started | - |
 | 4. Theme System | 0/TBD | Not started | - |
 | 5. Parity Audit | 0/TBD | Not started | - |
