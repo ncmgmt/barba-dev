@@ -102,7 +102,8 @@
                 gsap.set(info, {
                   backgroundImage: 'none',
                   backgroundColor: 'transparent',
-                  overflowY: 'auto'
+                  overflowY: 'auto',
+                  maxHeight: '100%'
                 });
               });
 
