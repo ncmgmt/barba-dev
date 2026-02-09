@@ -323,21 +323,21 @@
                 var listItem = getListItem(card);
                 if (listItem) listItem.classList.remove('active');
 
-                var oldImgGrid = imgEl.querySelector('.bw-blockreveal__grid');
-                if (oldImgGrid) oldImgGrid.remove();
-                var oldInfoGrid = infoEl.querySelector('.bw-blockreveal__grid');
-                if (oldInfoGrid) oldInfoGrid.remove();
+                // Reverse of open: cells cover text, then dissolve with the panel.
+                // After hold, panel fades + image block reveal fires to uncover grayscale.
+                fireBlockReveal(infoEl, infoRevealOpts);
 
-                fireBlockReveal(imgEl);
-
-                gsap.to(infoEl, {
-                  opacity: 0,
-                  duration: 0.25,
-                  ease: 'power2.in',
-                  onComplete: function () {
-                    gsap.set(infoEl, { clipPath: 'inset(100% 0 0 0)' });
-                  }
-                });
+                setTimeout(function () {
+                  gsap.to(infoEl, {
+                    opacity: 0,
+                    duration: 0.3,
+                    ease: 'power2.in',
+                    onComplete: function () {
+                      gsap.set(infoEl, { clipPath: 'inset(100% 0 0 0)' });
+                    }
+                  });
+                  fireBlockReveal(imgEl);
+                }, 120);
               }
 
               teamCards.forEach(function (card, index) {
